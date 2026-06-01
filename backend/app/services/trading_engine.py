@@ -30,6 +30,7 @@ from app.services.broker import get_broker
 from app.services.broker.broker_interface import BrokerInterface
 from app.services.compliance_guard import ComplianceGuard
 from app.services.config_defaults import TradingConfigModel
+from app.services.market_data import fetch_ohlcv
 from app.services.notifications import send_telegram
 from app.services.risk_manager import RiskManager, TradePlan
 from app.services.signal_engine import generate_signal
@@ -196,3 +197,84 @@ class TradingEngine:
             f"SL {plan.stop_loss} / TP {plan.take_profit} (conf {confidence:.0%}, {mode})"
         )
         return {"action": "executed", "order_id": order.broker_order_id, "mode": mode}
+
+    # --- position lifecycle ---
+    async def close_position(self, symbol: str, reason: str = "manual") -> dict:
+        """Close an open position at the broker AND settle the DB Trade row."""
+        # Refresh the broker's price feed before closing (paper broker needs it).
+        try:
+            df = await fetch_ohlcv(symbol, bars=2, broker=self.broker)
+            price = float(df["close"].iloc[-1])
+            if hasattr(self.broker, "set_price"):
+                self.broker.set_price(symbol, price)
+        except Exception:
+            price = await self.broker.get_price(symbol)
+
+        order = await self.broker.close_position(symbol)
+        if order.status != "FILLED":
+            return {"action": "close_rejected", "symbol": symbol, "reason": order.reason}
+
+        exit_price = order.price or price
+        trade = (
+            await self.db.execute(
+                select(Trade)
+                .where(
+                    Trade.user_id == self.user_id,
+                    Trade.symbol == symbol,
+                    Trade.status == "OPEN",
+                )
+                .order_by(Trade.opened_at.desc())
+            )
+        ).scalars().first()
+
+        pnl = None
+        if trade is not None:
+            direction = 1 if trade.side == "BUY" else -1
+            pnl = round((exit_price - trade.entry_price) * trade.quantity * direction, 2)
+            trade.exit_price = exit_price
+            trade.pnl = pnl
+            trade.status = "CLOSED"
+            trade.closed_at = datetime.now(timezone.utc)
+
+        await log_audit(
+            self.db, event="POSITION_CLOSED", user_id=self.user_id,
+            message=f"closed {symbol} @ {exit_price} ({reason}) pnl={pnl}",
+            context={"reason": reason, "pnl": pnl},
+        )
+        await publish(
+            "events",
+            {"type": "position_closed", "user_id": self.user_id, "symbol": symbol,
+             "exit_price": exit_price, "pnl": pnl, "reason": reason},
+        )
+        await send_telegram(f"*Closed* {symbol} @ {exit_price} ({reason}) pnl={pnl}")
+        return {"action": "closed", "symbol": symbol, "exit_price": exit_price, "pnl": pnl}
+
+    async def monitor_positions(self) -> list[dict]:
+        """Check open positions against their stop-loss / take-profit and close
+        any that have been hit. Run every cycle so protective levels are honoured
+        even on brokers that don't enforce them server-side (e.g. paper)."""
+        results: list[dict] = []
+        for pos in await self.broker.get_positions():
+            try:
+                df = await fetch_ohlcv(pos.symbol, bars=2, broker=self.broker)
+                price = float(df["close"].iloc[-1])
+            except Exception:
+                continue
+            if hasattr(self.broker, "set_price"):
+                self.broker.set_price(pos.symbol, price)
+
+            hit = None
+            if pos.side == "BUY":
+                if pos.stop_loss and price <= pos.stop_loss:
+                    hit = "stop_loss"
+                elif pos.take_profit and price >= pos.take_profit:
+                    hit = "take_profit"
+            else:  # SELL
+                if pos.stop_loss and price >= pos.stop_loss:
+                    hit = "stop_loss"
+                elif pos.take_profit and price <= pos.take_profit:
+                    hit = "take_profit"
+
+            if hit:
+                results.append(await self.close_position(pos.symbol, reason=hit))
+        return results

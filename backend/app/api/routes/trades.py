@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import desc, func, select
@@ -61,29 +62,42 @@ async def performance(
     equity = await broker.get_balance()
     positions = await broker.get_positions()
 
-    total = await db.scalar(
-        select(func.count(Trade.id)).where(
-            Trade.user_id == user.id, Trade.status == "CLOSED"
+    # Pull all closed-trade PnLs (chronological) and derive metrics in Python.
+    rows = (
+        await db.execute(
+            select(Trade.pnl, Trade.closed_at).where(
+                Trade.user_id == user.id, Trade.status == "CLOSED", Trade.pnl.isnot(None)
+            ).order_by(Trade.closed_at.asc())
         )
-    ) or 0
-    wins = await db.scalar(
-        select(func.count(Trade.id)).where(
-            Trade.user_id == user.id, Trade.status == "CLOSED", Trade.pnl > 0
-        )
-    ) or 0
-    total_pnl = await db.scalar(
-        select(func.coalesce(func.sum(Trade.pnl), 0.0)).where(
-            Trade.user_id == user.id, Trade.status == "CLOSED"
-        )
-    ) or 0.0
+    ).all()
+    pnls = [float(p) for p, _ in rows]
+
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p < 0]
+    gross_profit, gross_loss = sum(wins), abs(sum(losses))
+    profit_factor = (gross_profit / gross_loss) if gross_loss else (999.0 if gross_profit else 0.0)
+
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    realized_today = sum(p for p, closed in rows if closed and closed >= today)
+
+    cum, equity_curve = 0.0, []
+    for p in pnls:
+        cum += p
+        equity_curve.append(round(cum, 2))
 
     return PerformanceOut(
         equity=round(equity, 2),
         open_positions=len(positions),
-        realized_pnl_today=0.0,
-        total_trades=total,
-        win_rate=round(wins / total, 4) if total else 0.0,
-        total_pnl=round(float(total_pnl), 2),
+        realized_pnl_today=round(realized_today, 2),
+        total_trades=len(pnls),
+        win_rate=round(len(wins) / len(pnls), 4) if pnls else 0.0,
+        total_pnl=round(sum(pnls), 2),
+        profit_factor=round(profit_factor, 3),
+        avg_win=round(sum(wins) / len(wins), 2) if wins else 0.0,
+        avg_loss=round(sum(losses) / len(losses), 2) if losses else 0.0,
+        best_trade=round(max(pnls), 2) if pnls else 0.0,
+        worst_trade=round(min(pnls), 2) if pnls else 0.0,
+        equity_curve=equity_curve,
     )
 
 

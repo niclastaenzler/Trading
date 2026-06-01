@@ -11,10 +11,9 @@ Pydantic model enforces safe bounds on read/write.
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, JSONType
 
 
 class TradingConfig(Base):
@@ -24,7 +23,7 @@ class TradingConfig(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
 
     # Validated TradingConfigModel serialized to JSON.
-    data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    data: Mapped[dict] = mapped_column(JSONType, default=dict)
 
     # Live runtime flags kept out of `data` so the engine can flip them fast.
     auto_trading_enabled: Mapped[bool] = mapped_column(default=False)

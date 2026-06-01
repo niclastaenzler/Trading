@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { api, getToken, wsUrl } from "@/lib/api";
+
+const EquityChart = dynamic(() => import("@/app/components/EquityChart"), {
+  ssr: false,
+});
 
 export default function Dashboard() {
   const router = useRouter();
@@ -110,7 +115,24 @@ export default function Dashboard() {
             ${perf.total_pnl?.toFixed(2)}
           </div>
         </div>
+        <div className="card">
+          <h3>Profit factor</h3>
+          <div className="metric">{perf.profit_factor}</div>
+        </div>
+        <div className="card">
+          <h3>PnL today</h3>
+          <div className={`metric ${perf.realized_pnl_today >= 0 ? "pos" : "neg"}`}>
+            ${perf.realized_pnl_today?.toFixed(2)}
+          </div>
+        </div>
       </div>
+
+      {perf.equity_curve?.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <h3>Realized PnL curve</h3>
+          <EquityChart data={perf.equity_curve} color="#2ecc71" />
+        </div>
+      )}
 
       {pending.length > 0 && (
         <div className="card" style={{ marginTop: 16 }}>

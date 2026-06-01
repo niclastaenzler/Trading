@@ -27,8 +27,16 @@ def main() -> None:
     df = synthetic_ohlcv(bars=args.bars, seed=args.seed)
     enriched = indicators.compute_all(df, IndicatorParams())
     model = AIModel()
+
+    wf = model.walk_forward(enriched, folds=5)
     stats = model.train(enriched)
-    print(f"Trained on {stats['trained_on']} samples; in-sample score={stats['score']:.3f}")
+    print(
+        f"Trained on {stats['trained_on']} / tested on {stats['tested_on']} samples\n"
+        f"  in-sample score : {stats['train_score']:.3f}\n"
+        f"  out-of-sample   : {stats['test_score']:.3f}\n"
+        f"  walk-forward    : mean OOS {wf['mean_oos_score']} over {wf['folds']} folds "
+        f"{wf['fold_scores']}"
+    )
     print("Saved to models/ai_model.pkl")
 
 

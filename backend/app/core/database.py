@@ -2,6 +2,8 @@
 
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -10,6 +12,10 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
+
+# Portable JSON column: JSONB on PostgreSQL (production/Supabase), plain JSON
+# elsewhere (e.g. SQLite in tests). Lets the ORM models run on either backend.
+JSONType = JSON().with_variant(JSONB(), "postgresql")
 
 
 class Base(DeclarativeBase):

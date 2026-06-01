@@ -62,24 +62,72 @@ class AIModel:
             except Exception:
                 self._model = None
 
-    # --- training ---
-    def train(self, df: pd.DataFrame) -> dict:
-        if not _SKLEARN:
-            raise RuntimeError("scikit-learn not installed; cannot train.")
+    @staticmethod
+    def _labelled(df: pd.DataFrame):
         feat = build_features(df)
-        # Label: 1 if next-bar return positive, else 0.
         future_ret = df["close"].shift(-1) / df["close"] - 1
         label = (future_ret > 0).astype(int)
         mask = future_ret.notna()
-        X, y = feat[mask][FEATURES], label[mask]
-        model = GradientBoostingClassifier(
+        return feat[mask][FEATURES], label[mask]
+
+    @staticmethod
+    def _new_estimator():
+        return GradientBoostingClassifier(
             n_estimators=120, max_depth=3, learning_rate=0.05, random_state=42
         )
-        model.fit(X, y)
+
+    # --- training ---
+    def train(self, df: pd.DataFrame, test_fraction: float = 0.2) -> dict:
+        """Fit on a chronological train split and report OUT-OF-SAMPLE accuracy.
+
+        A chronological (not random) split prevents look-ahead leakage. The
+        out-of-sample score is the honest estimate of generalisation.
+        """
+        if not _SKLEARN:
+            raise RuntimeError("scikit-learn not installed; cannot train.")
+        X, y = self._labelled(df)
+        split = int(len(X) * (1 - test_fraction))
+        X_train, X_test = X.iloc[:split], X.iloc[split:]
+        y_train, y_test = y.iloc[:split], y.iloc[split:]
+
+        model = self._new_estimator()
+        model.fit(X_train, y_train)
         os.makedirs(os.path.dirname(MODEL_PATH) or ".", exist_ok=True)
         joblib.dump(model, MODEL_PATH)
         self._model = model
-        return {"trained_on": int(mask.sum()), "score": float(model.score(X, y))}
+        return {
+            "trained_on": int(len(X_train)),
+            "tested_on": int(len(X_test)),
+            "train_score": float(model.score(X_train, y_train)),
+            "test_score": (
+                float(model.score(X_test, y_test)) if len(X_test) else None
+            ),
+        }
+
+    def walk_forward(self, df: pd.DataFrame, folds: int = 5) -> dict:
+        """Expanding-window walk-forward validation.
+
+        Splits the history into `folds` sequential test blocks; for each block,
+        train on everything before it and score on the block. Reports the mean
+        out-of-sample accuracy — a realistic view of live performance.
+        """
+        if not _SKLEARN:
+            raise RuntimeError("scikit-learn not installed; cannot evaluate.")
+        X, y = self._labelled(df)
+        n = len(X)
+        fold_size = n // (folds + 1)
+        scores = []
+        for k in range(1, folds + 1):
+            train_end = fold_size * k
+            test_end = min(fold_size * (k + 1), n)
+            if test_end - train_end < 5:
+                continue
+            model = self._new_estimator()
+            model.fit(X.iloc[:train_end], y.iloc[:train_end])
+            scores.append(float(model.score(X.iloc[train_end:test_end], y.iloc[train_end:test_end])))
+        mean = float(sum(scores) / len(scores)) if scores else None
+        return {"folds": len(scores), "fold_scores": [round(s, 3) for s in scores],
+                "mean_oos_score": round(mean, 3) if mean is not None else None}
 
     # --- inference ---
     def predict(self, df: pd.DataFrame) -> Prediction:

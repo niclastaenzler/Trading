@@ -10,6 +10,8 @@ from __future__ import annotations
 import abc
 from dataclasses import dataclass
 
+import pandas as pd
+
 
 @dataclass
 class BrokerOrder:
@@ -32,6 +34,8 @@ class BrokerPosition:
     entry_price: float
     current_price: float
     unrealized_pnl: float
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
 
 class BrokerInterface(abc.ABC):
@@ -49,6 +53,16 @@ class BrokerInterface(abc.ABC):
     @abc.abstractmethod
     async def get_price(self, symbol: str) -> float:
         """Latest mid price for `symbol`."""
+
+    async def get_candles(
+        self, symbol: str, resolution: str = "HOUR", limit: int = 200
+    ) -> pd.DataFrame | None:
+        """Recent OHLCV candles, or None if this broker has no data feed.
+
+        Optional: brokers without a documented candles endpoint return None and
+        the caller falls back to the synthetic generator.
+        """
+        return None
 
     @abc.abstractmethod
     async def place_order(

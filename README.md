@@ -22,7 +22,14 @@ expectations for personal automated trading.
   configs are **clamped or rejected** by a validated config envelope.
 - **Explainable signals** — every trade records the AI / pattern / trend
   contributions that produced it.
-- **Backtesting** that reuses the *same* signal + risk code as live trading.
+- **Backtesting** (Sharpe, Sortino, profit factor, avg win/loss, drawdown) that
+  reuses the *same* signal + risk code as live trading.
+- **Real market data** via the broker's documented candles endpoint, with a
+  deterministic synthetic fallback for offline demo/backtest.
+- **Automatic position management** — open positions are monitored each cycle
+  and closed when their stop-loss / take-profit is hit.
+- **Honest AI evaluation** — chronological train/test split + walk-forward
+  out-of-sample scoring (no in-sample self-deception).
 - **Paper + live brokers** behind one interface (paper default, Capital.com
   adapter included, TradingView webhook bridge).
 
@@ -99,9 +106,12 @@ tick can never become high-frequency trading.
 │   │   │   ├── market_data.py       # OHLCV (synthetic for demo/backtest)
 │   │   │   └── notifications.py     # Telegram alerts
 │   │   └── backtest/engine.py
-│   ├── scripts/train_model.py
-│   └── tests/                  # indicators, config safety, risk, compliance, backtest
-└── frontend/                   # Next.js (dashboard, config panel, trades, backtest)
+│   ├── migrations/             # Alembic (async) — versioned schema
+│   ├── scripts/train_model.py  # train + walk-forward evaluation
+│   └── tests/                  # unit (logic) + integration (ASGI/SQLite/fakeredis)
+├── frontend/                   # Next.js (dashboard, config panel, trades, backtest)
+│   └── app/components/EquityChart.tsx   # TradingView Lightweight-Charts
+└── .github/workflows/ci.yml    # CI: backend pytest + frontend build
 ```
 
 ---
@@ -199,7 +209,16 @@ npm install
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
 
-**Tests**
+**Database migrations (production)**
+
+`init_models()` auto-creates tables for first-run/dev. For production use
+Alembic (the DB URL is read from your environment):
+
+```bash
+cd backend && alembic upgrade head
+```
+
+**Tests** (37: unit logic + ASGI integration, no external services needed)
 
 ```bash
 cd backend && pytest -q

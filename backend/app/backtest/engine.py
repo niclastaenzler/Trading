@@ -26,6 +26,10 @@ class BacktestResult:
     win_rate: float
     max_drawdown_pct: float
     sharpe: float
+    sortino: float
+    profit_factor: float
+    avg_win: float
+    avg_loss: float
     equity_curve: list[float] = field(default_factory=list)
     trades: list[dict] = field(default_factory=list)
 
@@ -96,14 +100,25 @@ def run_backtest(
         equity_curve.append(round(equity, 2))
 
     # Metrics.
-    wins = [t for t in trades if t["pnl"] > 0]
+    wins = [t["pnl"] for t in trades if t["pnl"] > 0]
+    losses = [t["pnl"] for t in trades if t["pnl"] < 0]
     win_rate = len(wins) / len(trades) if trades else 0.0
+    gross_profit = sum(wins)
+    gross_loss = abs(sum(losses))
+    profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else (
+        float("inf") if gross_profit > 0 else 0.0
+    )
+
     curve = np.array(equity_curve) if equity_curve else np.array([starting_equity])
     running_peak = np.maximum.accumulate(curve)
     drawdowns = (running_peak - curve) / running_peak
     max_dd = float(drawdowns.max() * 100) if len(drawdowns) else 0.0
     rets = np.diff(curve) / curve[:-1] if len(curve) > 1 else np.array([0.0])
     sharpe = float(np.mean(rets) / np.std(rets) * np.sqrt(252)) if np.std(rets) > 0 else 0.0
+    # Sortino uses downside deviation only.
+    downside = rets[rets < 0]
+    dd_std = np.std(downside) if len(downside) else 0.0
+    sortino = float(np.mean(rets) / dd_std * np.sqrt(252)) if dd_std > 0 else 0.0
 
     return BacktestResult(
         starting_equity=starting_equity,
@@ -113,6 +128,10 @@ def run_backtest(
         win_rate=round(win_rate, 4),
         max_drawdown_pct=round(max_dd, 2),
         sharpe=round(sharpe, 3),
+        sortino=round(sortino, 3),
+        profit_factor=round(profit_factor, 3) if profit_factor != float("inf") else 999.0,
+        avg_win=round(float(np.mean(wins)), 2) if wins else 0.0,
+        avg_loss=round(float(np.mean(losses)), 2) if losses else 0.0,
         equity_curve=equity_curve,
         trades=trades,
     )

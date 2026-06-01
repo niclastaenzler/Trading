@@ -38,11 +38,16 @@ async def _run_user_cycle(user: User, cfg_row: TradingConfig) -> None:
         broker = get_broker(user.id, user.broker_name, creds)
         await broker.connect()
         engine = TradingEngine(db, user.id, cfg_row, broker)
+
+        # 1. Honour protective levels on already-open positions.
+        await engine.monitor_positions()
+
+        # 2. Look for new entries.
         symbols = (cfg_row.data or {}).get("trading", {}).get(
             "allowed_symbols", ["EURUSD"]
         )
         for symbol in symbols:
-            ohlcv = await fetch_ohlcv(symbol, bars=200)
+            ohlcv = await fetch_ohlcv(symbol, bars=200, broker=broker)
             await engine.process_symbol(symbol, ohlcv)
         await db.commit()
 

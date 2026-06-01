@@ -34,12 +34,36 @@ def synthetic_ohlcv(
     )
 
 
-async def fetch_ohlcv(symbol: str, bars: int = 200, seed: int | None = None) -> pd.DataFrame:
+_RESOLUTION = {
+    "1m": "MINUTE", "5m": "MINUTE_5", "15m": "MINUTE_15",
+    "1h": "HOUR", "4h": "HOUR_4", "1d": "DAY",
+}
+
+
+async def fetch_ohlcv(
+    symbol: str,
+    bars: int = 200,
+    seed: int | None = None,
+    broker=None,
+    timeframe: str = "1h",
+) -> pd.DataFrame:
     """Return recent OHLCV for `symbol`.
 
-    Paper/demo path uses synthetic data. Swap this for the broker's documented
-    candles endpoint in production.
+    Uses the broker's documented candles endpoint when one is available
+    (real market data); otherwise falls back to a deterministic synthetic
+    series so demo/paper/backtest stay fully functional offline.
     """
+    if broker is not None:
+        try:
+            candles = await broker.get_candles(
+                symbol, resolution=_RESOLUTION.get(timeframe, "HOUR"), limit=bars
+            )
+            if candles is not None and len(candles) >= 50:
+                return candles
+        except Exception:
+            # Never let a data-feed hiccup crash the cycle; fall back to synthetic.
+            pass
+
     # Derive a per-symbol seed so each instrument has a stable but distinct series.
     sym_seed = (seed if seed is not None else 0) + sum(ord(c) for c in symbol)
     return synthetic_ohlcv(bars=bars, seed=sym_seed)

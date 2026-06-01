@@ -85,6 +85,7 @@ class PaperBroker(BrokerInterface):
                     symbol=p["symbol"], side=p["side"], quantity=p["quantity"],
                     entry_price=p["entry_price"], current_price=cur,
                     unrealized_pnl=round(pnl, 2),
+                    stop_loss=p.get("stop_loss"), take_profit=p.get("take_profit"),
                 )
             )
         return out

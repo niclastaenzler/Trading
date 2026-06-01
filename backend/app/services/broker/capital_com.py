@@ -15,6 +15,7 @@ This adapter is network-bound; it is exercised in integration (not unit) tests.
 from __future__ import annotations
 
 import httpx
+import pandas as pd
 
 from app.core.logging_config import get_logger
 from app.services.broker.broker_interface import (
@@ -87,6 +88,43 @@ class CapitalComBroker(BrokerInterface):
             return (float(bid) + float(offer)) / 2.0
         return float(bid or offer or 0.0)
 
+    async def get_candles(
+        self, symbol: str, resolution: str = "HOUR", limit: int = 200
+    ) -> pd.DataFrame | None:
+        """Fetch OHLC candles from the documented /prices endpoint."""
+        resp = await self._client.get(
+            f"/api/v1/prices/{symbol}",
+            headers=self._auth_headers(),
+            params={"resolution": resolution, "max": limit},
+        )
+        if resp.status_code >= 400:
+            return None
+        rows = resp.json().get("prices", [])
+        if not rows:
+            return None
+
+        def mid(p):  # bid/ask -> mid
+            bid, ask = p.get("bid"), p.get("ask")
+            vals = [float(v) for v in (bid, ask) if v is not None]
+            return sum(vals) / len(vals) if vals else None
+
+        records = []
+        for r in rows:
+            o, h, l, c = (mid(r.get(k, {})) for k in
+                          ("openPrice", "highPrice", "lowPrice", "closePrice"))
+            if None in (o, h, l, c):
+                continue
+            records.append(
+                {"open": o, "high": h, "low": l, "close": c,
+                 "volume": float(r.get("lastTradedVolume", 0) or 0),
+                 "ts": r.get("snapshotTimeUTC") or r.get("snapshotTime")}
+            )
+        if not records:
+            return None
+        df = pd.DataFrame(records)
+        df.index = pd.to_datetime(df.pop("ts"), errors="coerce")
+        return df[["open", "high", "low", "close", "volume"]]
+
     async def place_order(
         self,
         symbol: str,
@@ -136,6 +174,7 @@ class CapitalComBroker(BrokerInterface):
                     symbol=market.get("epic", ""), side=direction, quantity=size,
                     entry_price=entry, current_price=cur,
                     unrealized_pnl=round((cur - entry) * size * sign, 2),
+                    stop_loss=pos.get("stopLevel"), take_profit=pos.get("profitLevel"),
                 )
             )
         return out

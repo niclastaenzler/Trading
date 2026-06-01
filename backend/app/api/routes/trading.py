@@ -49,11 +49,12 @@ async def run_cycle(
     engine = TradingEngine(db, user.id, cfg, broker)
     symbols = cfg.data.get("trading", {}).get("allowed_symbols", ["EURUSD"])
 
+    closed = await engine.monitor_positions()
     results = []
     for symbol in symbols:
-        ohlcv = await fetch_ohlcv(symbol, bars=200)
+        ohlcv = await fetch_ohlcv(symbol, bars=200, broker=broker)
         results.append(await engine.process_symbol(symbol, ohlcv))
-    return {"cycle": "complete", "results": results}
+    return {"cycle": "complete", "closed": closed, "results": results}
 
 
 @router.get("/pending")
@@ -101,9 +102,11 @@ async def confirm_pending(
 @router.post("/close/{symbol}")
 async def close_position(
     symbol: str,
+    cfg: TradingConfig = Depends(get_user_config),
     user: User = Depends(require_owner),
+    db: AsyncSession = Depends(get_db),
 ):
     broker = _build_broker(user)
     await broker.connect()
-    order = await broker.close_position(symbol)
-    return {"status": order.status, "reason": order.reason}
+    engine = TradingEngine(db, user.id, cfg, broker)
+    return await engine.close_position(symbol, reason="manual")

@@ -1,9 +1,11 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class TradeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     symbol: str
     side: str
@@ -20,11 +22,10 @@ class TradeOut(BaseModel):
     opened_at: datetime
     closed_at: datetime | None
 
-    class Config:
-        from_attributes = True
-
 
 class OrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     symbol: str
     side: str
@@ -35,9 +36,6 @@ class OrderOut(BaseModel):
     reason: str | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class PerformanceOut(BaseModel):
     equity: float
@@ -46,6 +44,13 @@ class PerformanceOut(BaseModel):
     total_trades: int
     win_rate: float
     total_pnl: float
+    profit_factor: float
+    avg_win: float
+    avg_loss: float
+    best_trade: float
+    worst_trade: float
+    # Cumulative realized-PnL curve built from closed trades (for charting).
+    equity_curve: list[float] = []
 
 
 class BrokerCredentials(BaseModel):

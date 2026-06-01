@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { api, getToken } from "@/lib/api";
+
+// Charts touch the DOM/canvas, so load client-side only.
+const EquityChart = dynamic(() => import("@/app/components/EquityChart"), {
+  ssr: false,
+});
 
 export default function BacktestPage() {
   const router = useRouter();
@@ -20,21 +26,6 @@ export default function BacktestPage() {
     setBusy(true);
     setResult(await api.backtest(symbol, bars));
     setBusy(false);
-  }
-
-  // Tiny inline SVG equity curve (no chart dependency).
-  function Curve({ data }: { data: number[] }) {
-    if (!data?.length) return null;
-    const w = 800, h = 180, min = Math.min(...data), max = Math.max(...data);
-    const range = max - min || 1;
-    const pts = data
-      .map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`)
-      .join(" ");
-    return (
-      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: 180 }}>
-        <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2" />
-      </svg>
-    );
   }
 
   return (
@@ -64,10 +55,13 @@ export default function BacktestPage() {
             <div className="card"><h3>Win rate</h3><div className="metric">{(result.win_rate * 100).toFixed(1)}%</div></div>
             <div className="card"><h3>Max drawdown</h3><div className="metric neg">{result.max_drawdown_pct}%</div></div>
             <div className="card"><h3>Sharpe</h3><div className="metric">{result.sharpe}</div></div>
+            <div className="card"><h3>Sortino</h3><div className="metric">{result.sortino}</div></div>
+            <div className="card"><h3>Profit factor</h3><div className="metric">{result.profit_factor}</div></div>
+            <div className="card"><h3>Avg win / loss</h3><div className="metric"><span className="pos">{result.avg_win}</span> / <span className="neg">{result.avg_loss}</span></div></div>
           </div>
           <div className="card" style={{ marginTop: 16 }}>
             <h3>Equity curve</h3>
-            <Curve data={result.equity_curve} />
+            <EquityChart data={result.equity_curve} />
           </div>
         </>
       )}

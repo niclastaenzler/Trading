@@ -3,10 +3,9 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Integer, String
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.core.database import Base, JSONType
 
 
 class AuditLog(Base):
@@ -19,7 +18,7 @@ class AuditLog(Base):
     event: Mapped[str] = mapped_column(String(64), index=True)
     severity: Mapped[str] = mapped_column(String(16), default="info")
     message: Mapped[str] = mapped_column(String(512))
-    context: Mapped[dict] = mapped_column(JSONB, default=dict)
+    context: Mapped[dict] = mapped_column(JSONType, default=dict)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
