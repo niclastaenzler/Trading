@@ -43,6 +43,13 @@ python -m research.run_research --dataset predictable    # MUST report EDGE
 python -m research.run_research --dataset csv --csv research/data/aapl.csv --ppy 252
 python -m research.run_research --dataset binance --symbol BTCUSDT --interval 1d   # current crypto (needs network)
 python -m research.run_research --dataset yfinance --symbol SPY                    # needs yfinance + network
+
+# Current candles via your broker demo account (e.g. Capital.com):
+export BROKER=capital_com CAPITAL_COM_API_KEY=... CAPITAL_COM_IDENTIFIER=... \
+       CAPITAL_COM_PASSWORD=... CAPITAL_COM_DEMO=true
+python -m research.run_research --dataset broker --symbol EURUSD --resolution DAY --limit 1000
+# resolution: MINUTE / MINUTE_5 / MINUTE_15 / HOUR / HOUR_4 / DAY
+# symbol = the broker's "epic" (e.g. EURUSD, US500, BTCUSD on Capital.com)
 ```
 
 ## ⚠️ Current data & this sandbox

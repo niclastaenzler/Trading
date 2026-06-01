@@ -14,6 +14,7 @@ Examples
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 from datetime import datetime, timezone
@@ -39,14 +40,49 @@ def load(args) -> ds.Dataset:
         return ds.load_binance(symbol=args.symbol, interval=args.interval)
     if d == "yfinance":
         return ds.load_yfinance(symbol=args.symbol)
+    if d == "broker":
+        return _load_broker(args)
     raise SystemExit(f"unknown dataset '{d}'")
+
+
+def _load_broker(args) -> ds.Dataset:
+    """Pull current candles via the app's broker integration (e.g. Capital.com
+    demo). Credentials come from environment variables / .env (see config.py):
+        BROKER, CAPITAL_COM_API_KEY, CAPITAL_COM_IDENTIFIER,
+        CAPITAL_COM_PASSWORD, CAPITAL_COM_DEMO=true
+    """
+    from app.config import settings
+    from app.services.broker import get_broker
+
+    broker_name = args.broker or settings.broker
+    if broker_name == "paper":
+        raise SystemExit(
+            "Set BROKER=capital_com (or pass --broker capital_com) and provide "
+            "demo credentials in your environment to pull live candles."
+        )
+
+    async def _run() -> ds.Dataset:
+        broker = get_broker(0, broker_name)
+        await broker.connect()
+        try:
+            return await ds.load_broker(
+                args.symbol, broker, resolution=args.resolution, limit=args.limit
+            )
+        finally:
+            if hasattr(broker, "aclose"):
+                await broker.aclose()
+
+    return asyncio.run(_run())
 
 
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--dataset", default="predictable",
-                   choices=["random", "predictable", "csv", "binance", "yfinance"])
+                   choices=["random", "predictable", "csv", "binance", "yfinance", "broker"])
     p.add_argument("--csv"); p.add_argument("--symbol", default="BTCUSDT")
+    p.add_argument("--broker", default=None, help="broker name for --dataset broker (e.g. capital_com)")
+    p.add_argument("--resolution", default="DAY", help="broker candle resolution: MINUTE_5/HOUR/DAY ...")
+    p.add_argument("--limit", type=int, default=1000, help="number of candles to request")
     p.add_argument("--interval", default="1d"); p.add_argument("--ppy", type=int, default=252)
     p.add_argument("--phi", type=float, default=0.25); p.add_argument("--seed", type=int, default=0)
     p.add_argument("--splits", type=int, default=8); p.add_argument("--threshold", type=float, default=0.0)
