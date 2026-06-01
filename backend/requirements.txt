@@ -1,0 +1,38 @@
+# --- Web framework ---
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+websockets==12.0
+
+# --- Settings / validation ---
+pydantic==2.7.4
+pydantic-settings==2.3.4
+email-validator==2.2.0
+
+# --- Database ---
+sqlalchemy[asyncio]==2.0.31
+asyncpg==0.29.0
+alembic==1.13.2
+
+# --- Cache / realtime bus ---
+redis==5.0.7
+
+# --- Security ---
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+cryptography==42.0.8
+
+# --- Numerics / data ---
+numpy==1.26.4
+pandas==2.2.2
+
+# --- Optional ML (example AI model) ---
+scikit-learn==1.5.0
+joblib==1.4.2
+
+# --- HTTP client (broker APIs, telegram) ---
+httpx==0.27.0
+
+# --- Tests ---
+pytest==8.2.2
+pytest-asyncio==0.23.7
