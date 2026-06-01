@@ -81,3 +81,30 @@ async def test_performance_shape(owner_client):
     data = res.json()
     for key in ("equity", "profit_factor", "avg_win", "avg_loss", "equity_curve"):
         assert key in data
+
+
+async def test_performance_with_closed_trades(owner_client):
+    """Regression: performance must handle CLOSED trades whose closed_at is
+    naive (SQLite) without raising on the tz-aware 'today' comparison."""
+    from datetime import datetime, timezone
+
+    from app.models.trade import Trade
+
+    async with owner_client.test_sessionmaker() as s:
+        s.add_all([
+            Trade(user_id=1, symbol="EURUSD", side="BUY", quantity=1000,
+                  entry_price=1.10, exit_price=1.11, status="CLOSED",
+                  mode="paper", pnl=10.0, closed_at=datetime.now(timezone.utc)),
+            Trade(user_id=1, symbol="GBPUSD", side="SELL", quantity=1000,
+                  entry_price=1.25, exit_price=1.26, status="CLOSED",
+                  mode="paper", pnl=-5.0, closed_at=datetime.now(timezone.utc)),
+        ])
+        await s.commit()
+
+    res = await owner_client.get("/api/trades/performance")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total_trades"] == 2
+    assert data["total_pnl"] == 5.0
+    assert data["profit_factor"] == 2.0  # 10 / 5
+    assert len(data["equity_curve"]) == 2

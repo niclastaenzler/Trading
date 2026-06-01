@@ -78,7 +78,13 @@ async def performance(
     profit_factor = (gross_profit / gross_loss) if gross_loss else (999.0 if gross_profit else 0.0)
 
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    realized_today = sum(p for p, closed in rows if closed and closed >= today)
+
+    def _aware(dt):
+        # SQLite returns naive datetimes even for timezone=True columns; assume
+        # UTC so the comparison is valid on both SQLite and PostgreSQL.
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+    realized_today = sum(p for p, closed in rows if closed and _aware(closed) >= today)
 
     cum, equity_curve = 0.0, []
     for p in pnls:

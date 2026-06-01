@@ -218,7 +218,28 @@ Alembic (the DB URL is read from your environment):
 cd backend && alembic upgrade head
 ```
 
-**Tests** (37: unit logic + ASGI integration, no external services needed)
+**Fastest path — no Docker, no Postgres** (SQLite + a local Redis). Verified to
+run the whole stack end-to-end:
+
+```bash
+# 1. Redis (only external service needed)
+redis-server --daemonize yes
+
+# 2. Backend (SQLite file DB, auto-creates tables)
+cd backend && source .venv/bin/activate
+export DATABASE_URL="sqlite+aiosqlite:///./app.db" REDIS_URL="redis://localhost:6379/0"
+export ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())")
+uvicorn app.main:app --reload          # http://localhost:8000/docs
+
+# 3. Frontend (in another shell)
+cd frontend && npm install
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev   # http://localhost:3000
+```
+
+Then open <http://localhost:3000>, register (first account = owner), and you're
+in the dashboard in paper mode.
+
+**Tests** (44: unit logic + ASGI integration, no external services needed)
 
 ```bash
 cd backend && pytest -q
