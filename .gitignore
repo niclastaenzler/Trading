@@ -27,6 +27,8 @@ yarn-error.log*
 **/models/*.pkl
 *.pkl
 *.log
+backend/research/reports/
+backend/research/data/*.json
 data/
 
 # OS / IDE

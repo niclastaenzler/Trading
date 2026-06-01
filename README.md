@@ -244,6 +244,19 @@ cd backend && python -m scripts.train_model --bars 3000
 
 ---
 
+## 🔬 Edge research harness
+
+`backend/research/` is a standalone, **honest** quant-research pipeline to search
+for and evaluate a statistical edge: no-lookahead features (+ optional
+news/sentiment), baseline→logistic→gradient-boosting models, **walk-forward**
+validation (no random split), significance testing (binomial, t-test, and
+Monte-Carlo **vs random**), and leverage analysis that only runs once an edge is
+proven. It loads **current** data (Binance/yfinance/broker) where the network
+permits, and ships known-truth synthetic controls to validate the detector
+itself. See [`backend/research/README.md`](backend/research/README.md) for the
+methodology, how to run on live data, and the honest findings (TL;DR: daily
+single-asset direction shows **no robust edge** — as expected).
+
 ## 🤖 Bonus integrations
 
 - **TradingView**: point an alert webhook at `POST /api/webhooks/tradingview`
