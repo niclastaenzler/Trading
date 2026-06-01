@@ -16,13 +16,29 @@ export default function Nav() {
 
   if (pathname === "/login") return null;
 
+  const links = [
+    { href: "/", label: "Dashboard" },
+    { href: "/config", label: "Configuration" },
+    { href: "/trades", label: "Trades" },
+    { href: "/backtest", label: "Backtest" },
+  ];
+
   return (
     <nav className="nav">
-      <span className="brand">⚙️ AI Trading</span>
-      <Link href="/">Dashboard</Link>
-      <Link href="/config">Configuration</Link>
-      <Link href="/trades">Trades</Link>
-      <Link href="/backtest">Backtest</Link>
+      <Link href="/" className="brand">
+        <span className="brand-mark">◆</span> AI&nbsp;Trading
+      </Link>
+      <div className="nav-links">
+        {links.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className={`nav-link ${pathname === l.href ? "active" : ""}`}
+          >
+            {l.label}
+          </Link>
+        ))}
+      </div>
       {authed && (
         <button
           className="secondary"

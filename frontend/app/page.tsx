@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { api, getToken, wsUrl } from "@/lib/api";
@@ -16,12 +16,19 @@ export default function Dashboard() {
   const [pending, setPending] = useState<any[]>([]);
   const [feed, setFeed] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState(false);
+
+  // Refs keep the WebSocket handler pointing at the latest refresh() without
+  // re-opening the socket, and debounce burst events into one KPI refresh.
+  const refreshRef = useRef<() => void>(() => {});
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function refresh() {
     setPerf(await api.performance());
     setCfg(await api.getConfig());
     setPending((await api.pending()).pending || []);
   }
+  refreshRef.current = refresh;
 
   useEffect(() => {
     if (!getToken()) {
@@ -30,10 +37,38 @@ export default function Dashboard() {
     }
     refresh();
     const ws = new WebSocket(wsUrl());
+    ws.onopen = () => setLive(true);
+    ws.onclose = () => setLive(false);
     ws.onmessage = (ev) => {
-      setFeed((f) => [`${new Date().toLocaleTimeString()}  ${ev.data}`, ...f].slice(0, 50));
+      let line = String(ev.data);
+      let isTradeEvent = false;
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "order_placed") {
+          line = `🟢 ORDER ${msg.side} ${msg.symbol} @ ${msg.price} (${msg.mode})`;
+          isTradeEvent = true;
+        } else if (msg.type === "position_closed") {
+          line = `🔴 CLOSED ${msg.symbol} @ ${msg.exit_price}  pnl=${msg.pnl} (${msg.reason})`;
+          isTradeEvent = true;
+        } else if (msg.signal) {
+          const s = msg.signal;
+          const dir = s.direction > 0 ? "BUY" : s.direction < 0 ? "SELL" : "—";
+          line = `📡 ${msg.symbol} ${dir} conf ${(s.confidence * 100).toFixed(0)}%`;
+        }
+      } catch {
+        /* keep raw line */
+      }
+      setFeed((f) => [`${new Date().toLocaleTimeString()}  ${line}`, ...f].slice(0, 60));
+      // A trade changed account state -> refresh the KPI cards live (debounced).
+      if (isTradeEvent) {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => refreshRef.current(), 500);
+      }
     };
-    return () => ws.close();
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      ws.close();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -164,7 +199,12 @@ export default function Dashboard() {
       )}
 
       <div className="card" style={{ marginTop: 16 }}>
-        <h3>Live signal & event feed</h3>
+        <h3 className="row" style={{ justifyContent: "space-between" }}>
+          <span>Live signal &amp; event feed</span>
+          <span className={`live-dot ${live ? "on" : "off"}`}>
+            {live ? "LIVE" : "offline"}
+          </span>
+        </h3>
         <div className="feed">
           {feed.length === 0 && <div>Waiting for events…</div>}
           {feed.map((line, i) => (
