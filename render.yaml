@@ -54,3 +54,6 @@ services:
       # secret phrase; you enter it on the registration form.
       - key: REGISTRATION_INVITE_CODE
         sync: false
+      # Optional: Alpha Vantage key to activate the news-sentiment overlay.
+      - key: ALPHAVANTAGE_API_KEY
+        sync: false

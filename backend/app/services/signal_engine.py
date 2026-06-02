@@ -73,8 +73,12 @@ def generate_signal(
     df: pd.DataFrame,
     strategy: StrategySettings,
     edge: EdgeSettings | None = None,
+    sentiment: float = 0.0,
 ) -> Signal:
-    """Produce a fused, edge-filtered trading signal for the latest bar."""
+    """Produce a fused, edge-filtered trading signal for the latest bar.
+
+    `sentiment` (-1..1) is an optional news-sentiment overlay; 0 = neutral/off.
+    """
     enriched = indicators.compute_all(df, strategy.indicators)
     last = enriched.iloc[-1]
     price = float(last["close"])
@@ -127,6 +131,16 @@ def generate_signal(
     # Edge layer: selective trading + ranking score.
     edge = edge or EdgeSettings()
     passes, edge_score, reason = _apply_edge_layer(confidence, ctx, edge)
+
+    # News-sentiment overlay (only when a real value is present): veto trades that
+    # strongly oppose the news, and tilt the edge score toward aligned sentiment.
+    if strategy.use_sentiment and sentiment != 0.0:
+        components["sentiment"] = round(sentiment, 4)
+        if (direction > 0 and sentiment < -0.15) or (direction < 0 and sentiment > 0.15):
+            passes, reason = False, "News-Sentiment gegen Trade"
+        else:
+            edge_score = round(min(1.0, edge_score * (1 + 0.2 * direction * sentiment)), 4)
+
     components["edge_score"] = edge_score
     if not passes:
         components["edge_rejected"] = reason

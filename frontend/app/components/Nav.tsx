@@ -18,6 +18,7 @@ export default function Nav() {
 
   const links = [
     { href: "/", label: "Dashboard" },
+    { href: "/edges", label: "Edges" },
     { href: "/config", label: "Konfiguration" },
     { href: "/trades", label: "Trades" },
     { href: "/backtest", label: "Backtest" },

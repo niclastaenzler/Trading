@@ -33,6 +33,7 @@ from app.services.config_defaults import TradingConfigModel
 from app.services.market_data import fetch_ohlcv
 from app.services.notifications import send_telegram
 from app.services.risk_manager import RiskManager, TradePlan
+from app.services.sentiment import get_sentiment
 from app.services.signal_engine import generate_signal
 
 
@@ -77,7 +78,8 @@ class TradingEngine:
     # --- main entrypoint ---
     async def process_symbol(self, symbol: str, ohlcv: pd.DataFrame) -> dict:
         """Run the pipeline for one symbol. Returns a structured outcome."""
-        signal = generate_signal(symbol, ohlcv, self.cfg.strategy, self.cfg.edge)
+        sent = await get_sentiment(symbol) if self.cfg.strategy.use_sentiment else 0.0
+        signal = generate_signal(symbol, ohlcv, self.cfg.strategy, self.cfg.edge, sent)
 
         # Keep the paper broker's price feed in sync.
         if hasattr(self.broker, "set_price"):
@@ -288,7 +290,8 @@ class TradingEngine:
         for sym in symbols:
             try:
                 df = await fetch_ohlcv(sym, bars=200, broker=self.broker)
-                sig = generate_signal(sym, df, self.cfg.strategy, self.cfg.edge)
+                sent = await get_sentiment(sym) if self.cfg.strategy.use_sentiment else 0.0
+                sig = generate_signal(sym, df, self.cfg.strategy, self.cfg.edge, sent)
             except Exception:
                 continue
             out.append((sym, df, sig))

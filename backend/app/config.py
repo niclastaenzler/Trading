@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     tradingview_webhook_secret: str = "change-me"
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    # News/sentiment provider (Alpha Vantage). Empty = sentiment overlay neutral.
+    alphavantage_api_key: str = ""
 
     # --- CORS ---
     # Comma-separated origins, e.g. "https://user.github.io,http://localhost:3000".
