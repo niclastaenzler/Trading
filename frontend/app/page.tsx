@@ -184,6 +184,52 @@ export default function Dashboard() {
         <div className="banner">🛑 NOT-AUS AKTIV — der automatische Handel ist gestoppt.</div>
       )}
 
+      {/* Konto-Ticker (Platform-Header) */}
+      <div className="ticker">
+        <div className="tk">
+          <span className="lbl">KONTOSTAND</span>
+          <span className="val mono">{(account?.balance ?? perf.equity)?.toLocaleString()} </span>
+        </div>
+        <div className="sep" />
+        <div className="tk">
+          <span className="lbl">NICHT REAL. PnL</span>
+          <span className={`val mono ${(account?.unrealized_pnl ?? 0) >= 0 ? "pos" : "neg"}`}>
+            {account?.unrealized_pnl ?? 0}
+          </span>
+        </div>
+        <div className="tk">
+          <span className="lbl">PnL HEUTE</span>
+          <span className={`val mono ${perf.realized_pnl_today >= 0 ? "pos" : "neg"}`}>
+            {perf.realized_pnl_today?.toFixed(2)}
+          </span>
+        </div>
+        <div className="tk">
+          <span className="lbl">GESAMT-PnL</span>
+          <span className={`val mono ${perf.total_pnl >= 0 ? "pos" : "neg"}`}>{perf.total_pnl?.toFixed(2)}</span>
+        </div>
+        <div className="sep" />
+        <div className="tk">
+          <span className="lbl">OFFENE POS.</span>
+          <span className="val mono">{account?.open_positions ?? perf.open_positions}</span>
+        </div>
+        <div className="tk">
+          <span className="lbl">BROKER</span>
+          <span className="val" style={{ fontSize: 15 }}>
+            {account?.broker ?? "—"}{" "}
+            <span className={`pill ${account?.is_paper === false ? "on" : "off"}`} style={{ fontSize: 10 }}>
+              {account?.mode ?? "—"}
+            </span>
+          </span>
+        </div>
+        <div className="sep" />
+        <div className="tk">
+          <span className="lbl">AUTO-HANDEL</span>
+          <span className={`val ${cfg.auto_trading_enabled ? "pos" : "neg"}`} style={{ fontSize: 15 }}>
+            {cfg.auto_trading_enabled ? "● AKTIV" : "○ AUS"}
+          </span>
+        </div>
+      </div>
+
       <div className="row" style={{ marginBottom: 16 }}>
         <span>
           Auto-Handel:{" "}
@@ -207,26 +253,6 @@ export default function Dashboard() {
           Zyklus-Ergebnis: {cycleMsg}
         </div>
       )}
-
-      {/* Konto-Übersicht */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h3>Konto</h3>
-        {account?.ok ? (
-          <div className="row" style={{ gap: 28 }}>
-            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>BROKER</div><b>{account.broker}</b></div>
-            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>MODUS</div>
-              <span className={`pill ${account.is_paper ? "off" : "on"}`}>{account.mode}</span></div>
-            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>KONTOSTAND</div><b>{account.balance?.toLocaleString()}</b></div>
-            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>OFFENE POS.</div><b>{account.open_positions}</b></div>
-            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>NICHT REAL. PnL</div>
-              <b className={account.unrealized_pnl >= 0 ? "pos" : "neg"}>{account.unrealized_pnl}</b></div>
-          </div>
-        ) : (
-          <p style={{ color: "var(--muted)", fontSize: 13 }}>
-            Kein Broker verbunden / nicht erreichbar. Unter <b>Einstellungen</b> Capital.com verbinden.
-          </p>
-        )}
-      </div>
 
       {/* Live Trading View */}
       <div className="card" style={{ marginBottom: 16 }}>
@@ -268,11 +294,11 @@ export default function Dashboard() {
         ) : (
           <table>
             <thead>
-              <tr><th>#</th><th>Symbol</th><th>Signal</th><th>Konfidenz</th><th>Edge-Score</th><th>Rel. Stärke</th><th>Regime</th><th>Status</th></tr>
+              <tr><th>#</th><th>Symbol</th><th>Signal</th><th>Konfidenz</th><th>Edge-Score</th><th>Rel. Stärke</th><th>Hebel</th><th>Einsatz</th><th>Regime</th><th>Status</th></tr>
             </thead>
             <tbody>
               {scan.slice(0, 25).map((o, i) => (
-                <tr key={o.symbol} style={o.actionable ? { background: "rgba(46,204,113,.06)" } : {}}>
+                <tr key={o.symbol} className={o.actionable ? "win" : ""}>
                   <td>{i + 1}</td>
                   <td><b>{o.symbol}</b></td>
                   <td className={o.direction > 0 ? "pos" : o.direction < 0 ? "neg" : ""}>
@@ -281,6 +307,8 @@ export default function Dashboard() {
                   <td>{(o.confidence * 100).toFixed(0)}%</td>
                   <td><b>{((o.edge_score ?? 0) * 100).toFixed(0)}</b></td>
                   <td>{o.rel_strength != null ? (o.rel_strength * 100).toFixed(0) + "%" : "—"}</td>
+                  <td className="mono">{o.leverage != null ? o.leverage + "×" : "—"}</td>
+                  <td className="mono">{o.risk_eur != null ? o.risk_eur + " €" : "—"}</td>
                   <td>{o.regime === "trend" ? "📈 Trend" : o.regime === "range" ? "↔ Seitwärts" : "—"}</td>
                   <td>
                     {o.actionable
@@ -465,7 +493,7 @@ export default function Dashboard() {
             <thead><tr><th>Symbol</th><th>Seite</th><th>Einstieg</th><th>Ausstieg</th><th>PnL</th><th>Status</th></tr></thead>
             <tbody>
               {recentTrades.map((t) => (
-                <tr key={t.id}>
+                <tr key={t.id} className={t.status === "OPEN" ? "open" : (t.pnl ?? 0) >= 0 ? "win" : "loss"}>
                   <td>{t.symbol}</td><td>{t.side}</td><td>{t.entry_price}</td><td>{t.exit_price ?? "—"}</td>
                   <td className={t.pnl >= 0 ? "pos" : "neg"}>{t.pnl?.toFixed?.(2) ?? "—"}</td>
                   <td><span className={`pill ${t.status === "OPEN" ? "on" : "off"}`}>{t.status === "OPEN" ? "OFFEN" : "ZU"}</span></td>

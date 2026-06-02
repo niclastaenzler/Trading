@@ -75,11 +75,29 @@ async def scan_market(
 
     engine = _TE(None, user.id, cfg, broker)  # no DB needed for a read-only scan
     symbols = cfg.data.get("trading", {}).get("allowed_symbols", ["EURUSD"])
+    equity = 10_000.0
     try:
         ranked = await engine.scan(symbols)
+        try:
+            equity = float(await broker.get_balance()) or 10_000.0
+        except Exception:
+            equity = 10_000.0
     finally:
         if hasattr(broker, "aclose"):
             await broker.aclose()
+
+    def sizing(sig) -> dict:
+        """Risk amount, notional, and the IMPLIED leverage for this setup."""
+        if not sig.actionable:
+            return {"risk_eur": None, "notional": None, "leverage": None}
+        plan = engine.risk.build_plan(sig, equity)
+        notional = plan.quantity * sig.price
+        lev = round(notional / equity, 2) if equity > 0 else None
+        return {
+            "risk_eur": round(plan.risk_amount, 2),
+            "notional": round(notional, 2),
+            "leverage": lev,
+        }
 
     # Cross-sectional relative strength: rank each symbol's 20-bar momentum
     # against the rest of the scanned universe (0..1 percentile).
@@ -123,9 +141,11 @@ async def scan_market(
                 "price": round(sig.price, 6),
                 "actionable": sig.actionable,
                 "reason": reason(sig),
+                **sizing(sig),
             }
             for (s, _df, sig) in ranked
-        ]
+        ],
+        "equity": round(equity, 2),
     }
 
 

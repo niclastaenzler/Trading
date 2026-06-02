@@ -110,7 +110,28 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px
 
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; }
+th { color: var(--muted); font-weight: 600; position: sticky; top: 0; }
+tbody tr { transition: background .12s; }
+tbody tr:hover td { background: rgba(255, 255, 255, .03); }
+/* Colour-coded trade history rows (real-platform feel). */
+tr.win  td { background: rgba(46, 204, 113, .08); }
+tr.loss td { background: rgba(231, 76, 60, .08); }
+tr.open td { background: rgba(76, 139, 245, .07); }
+tr.win:hover td  { background: rgba(46, 204, 113, .14); }
+tr.loss:hover td { background: rgba(231, 76, 60, .14); }
+
+/* Account ticker bar — prominent platform header. */
+.ticker {
+  display: flex; gap: 26px; flex-wrap: wrap; align-items: center;
+  background: linear-gradient(180deg, #161c2b, var(--panel));
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 20px; margin-bottom: 16px;
+}
+.ticker .tk { display: flex; flex-direction: column; }
+.ticker .tk .lbl { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.ticker .tk .val { font-size: 22px; font-weight: 800; line-height: 1.2; }
+.ticker .sep { width: 1px; align-self: stretch; background: var(--border); }
+.mono { font-variant-numeric: tabular-nums; }
 
 .pill { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .pill.on {

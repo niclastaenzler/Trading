@@ -33,7 +33,7 @@ export default function TradesPage() {
               <tr><td colSpan={10} style={{ color: "var(--muted)" }}>Noch keine Trades.</td></tr>
             )}
             {trades.map((t) => (
-              <tr key={t.id}>
+              <tr key={t.id} className={t.status === "OPEN" ? "open" : (t.pnl ?? 0) >= 0 ? "win" : "loss"}>
                 <td>{t.symbol}</td>
                 <td>{t.side}</td>
                 <td>{t.quantity}</td>
