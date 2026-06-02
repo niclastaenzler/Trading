@@ -21,8 +21,12 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 
 def _to_out(cfg: TradingConfig) -> ConfigOut:
+    # Return the validated/normalised config so newly added fields (edge layer,
+    # confidence sizing, …) always appear with sane defaults for the UI, even if
+    # the stored JSON predates them.
+    normalised = TradingConfigModel(**(cfg.data or {})).model_dump(mode="json")
     return ConfigOut(
-        config=cfg.data,
+        config=normalised,
         auto_trading_enabled=cfg.auto_trading_enabled,
         kill_switch_active=cfg.kill_switch_active,
         version=cfg.version,

@@ -245,6 +245,21 @@ export default function ConfigPage() {
           {N("Max. Drawdown (%)", "risk.max_drawdown_pct")}
         </div>
         {B("Trailing-Stop aktiv", "risk.trailing_stop_enabled")}
+        {B("Positionsgröße nach KI-Konfidenz skalieren", "risk.confidence_scaled_sizing")}
+      </fieldset>
+
+      <fieldset className="fieldset">
+        <legend>Edge-Layer (selektives Handeln)</legend>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
+          Nur die wirklich attraktiven Setups handeln — Ziel ist besseres, nicht mehr Trading.
+        </p>
+        {B("Edge-Layer aktiv", "edge.enabled")}
+        {B("Nur im Trend handeln (Seitwärtsphasen meiden)", "edge.require_trend_regime")}
+        <div className="grid">
+          {N("Mindest-Edge-Score (0–1)", "edge.min_edge_score")}
+          {N("Mindest-Trendstärke (0–1)", "edge.min_trend_strength")}
+          {N("Max. Volatilitäts-Perzentil (0–1)", "edge.max_volatility_percentile")}
+        </div>
       </fieldset>
 
       <fieldset className="fieldset">

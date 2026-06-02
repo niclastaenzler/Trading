@@ -89,6 +89,8 @@ async def scan_market(
             return "gegen Trend"
         if c.get("below_threshold"):
             return "unter Konfidenzschwelle"
+        if c.get("edge_rejected"):
+            return c["edge_rejected"]
         return "kein klares Signal"
 
     return {
@@ -98,6 +100,8 @@ async def scan_market(
                 "action": "BUY" if sig.direction > 0 else ("SELL" if sig.direction < 0 else "—"),
                 "direction": sig.direction,
                 "confidence": round(sig.confidence, 4),
+                "edge_score": round(sig.edge_score, 4),
+                "regime": (sig.components.get("regime") or {}).get("regime", "—"),
                 "price": round(sig.price, 6),
                 "actionable": sig.actionable,
                 "reason": reason(sig),

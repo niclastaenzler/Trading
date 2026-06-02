@@ -106,6 +106,23 @@ class RiskSettings(BaseModel):
     daily_loss_limit_pct: float = Field(3.0, ge=0.5, le=10)
     max_drawdown_pct: float = Field(10.0, ge=2, le=30)
     require_stop_loss: bool = Field(True, description="Block trades without a stop")
+    # Scale position size by model confidence (within the risk-per-trade budget).
+    confidence_scaled_sizing: bool = True
+
+
+# ───────────────────────── Edge layer ─────────────────────────
+class EdgeSettings(BaseModel):
+    """Selective-trading layer: trade only the genuinely attractive setups."""
+
+    enabled: bool = True
+    # Minimum combined edge score (0..1) required to act.
+    min_edge_score: float = Field(0.5, ge=0, le=1)
+    # Only trade in a trending regime (skip choppy/sideways markets).
+    require_trend_regime: bool = True
+    # Minimum trend strength (Kaufman efficiency ratio) to act.
+    min_trend_strength: float = Field(0.3, ge=0, le=1)
+    # Skip when current volatility sits above this percentile of its own history.
+    max_volatility_percentile: float = Field(0.9, ge=0.1, le=1)
 
 
 # ───────────────────────── Compliance controls ─────────────────────────
@@ -128,6 +145,7 @@ class TradingConfigModel(BaseModel):
     strategy: StrategySettings = Field(default_factory=StrategySettings)
     automation: AutomationSettings = Field(default_factory=AutomationSettings)
     risk: RiskSettings = Field(default_factory=RiskSettings)
+    edge: EdgeSettings = Field(default_factory=EdgeSettings)
     compliance: ComplianceSettings = Field(default_factory=ComplianceSettings)
 
     @model_validator(mode="after")

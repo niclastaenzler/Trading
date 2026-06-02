@@ -77,7 +77,7 @@ class TradingEngine:
     # --- main entrypoint ---
     async def process_symbol(self, symbol: str, ohlcv: pd.DataFrame) -> dict:
         """Run the pipeline for one symbol. Returns a structured outcome."""
-        signal = generate_signal(symbol, ohlcv, self.cfg.strategy)
+        signal = generate_signal(symbol, ohlcv, self.cfg.strategy, self.cfg.edge)
 
         # Keep the paper broker's price feed in sync.
         if hasattr(self.broker, "set_price"):
@@ -288,9 +288,10 @@ class TradingEngine:
         for sym in symbols:
             try:
                 df = await fetch_ohlcv(sym, bars=200, broker=self.broker)
-                sig = generate_signal(sym, df, self.cfg.strategy)
+                sig = generate_signal(sym, df, self.cfg.strategy, self.cfg.edge)
             except Exception:
                 continue
             out.append((sym, df, sig))
-        out.sort(key=lambda x: (x[2].actionable, x[2].confidence), reverse=True)
+        # Rank by edge score (best setups first), actionable ahead of the rest.
+        out.sort(key=lambda x: (x[2].actionable, x[2].edge_score), reverse=True)
         return out

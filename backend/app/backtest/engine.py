@@ -82,7 +82,7 @@ def run_backtest(
 
         # Look for a new entry only when flat.
         if position is None:
-            signal = generate_signal(symbol, window, config.strategy)
+            signal = generate_signal(symbol, window, config.strategy, config.edge)
             if signal.actionable:
                 plan = risk.build_plan(signal, equity)
                 verdict = risk.validate(

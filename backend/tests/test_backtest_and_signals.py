@@ -21,6 +21,20 @@ def test_high_threshold_suppresses_trades():
     assert sig.direction == 0  # nothing clears a 99% bar
 
 
+def test_edge_layer_can_block_and_scores():
+    from app.services.config_defaults import EdgeSettings
+    df = synthetic_ohlcv(bars=300, seed=7)
+    strat = TradingConfigModel().strategy
+    strat.signal_confidence_threshold = 0.5
+    # An impossible edge bar (require very strong trend) should block trades.
+    strict = EdgeSettings(min_trend_strength=0.99, min_edge_score=0.99)
+    sig = generate_signal("EURUSD", df, strat, strict)
+    assert sig.direction == 0  # edge layer vetoes
+    assert "regime" in sig.components
+    # edge_score is always reported for ranking.
+    assert 0.0 <= sig.edge_score <= 1.0
+
+
 def test_backtest_produces_metrics():
     df = synthetic_ohlcv(bars=400, seed=11)
     result = run_backtest("EURUSD", df, TradingConfigModel(), starting_equity=10_000)

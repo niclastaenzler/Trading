@@ -108,6 +108,22 @@ async def test_market_scan_ranks_opportunities(owner_client):
         assert "symbol" in o and "confidence" in o and "actionable" in o
 
 
+async def test_research_edge_verdict(owner_client):
+    res = await owner_client.get("/api/research/edge?symbol=EURUSD&timeframe=1d&bars=900")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["ok"] is True
+    assert isinstance(data["has_edge"], bool)
+    assert "recommendations" in data and "feature_importance" in data
+
+
+async def test_config_exposes_edge_settings(owner_client):
+    res = await owner_client.get("/api/config")
+    cfg = res.json()["config"]
+    assert "edge" in cfg and "min_edge_score" in cfg["edge"]
+    assert "confidence_scaled_sizing" in cfg["risk"]
+
+
 async def test_performance_shape(owner_client):
     res = await owner_client.get("/api/trades/performance")
     assert res.status_code == 200

@@ -14,6 +14,7 @@ from app.api.routes import (
     backtest,
     config,
     market,
+    research,
     trades,
     trading,
     webhooks,
@@ -84,7 +85,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, config, trading, trades, backtest, market, webhooks):
+for module in (auth, config, trading, trades, backtest, market, research, webhooks):
     app.include_router(module.router)
 app.include_router(ws.router)
 

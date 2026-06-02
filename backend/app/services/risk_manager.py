@@ -43,10 +43,22 @@ class RiskManager:
         # percent of price
         return max(signal.price * risk.stop_loss_value / 100.0, 1e-9)
 
+    def _confidence_factor(self, signal: Signal) -> float:
+        """Scale 0.4..1.0 with model confidence so stronger setups risk more of
+        the (already capped) per-trade budget. Returns 1.0 when disabled."""
+        if not self.cfg.risk.confidence_scaled_sizing:
+            return 1.0
+        # Map confidence 0.5->0.4 (min) up to 0.9+->1.0.
+        return float(min(1.0, max(0.4, (signal.confidence - 0.5) / 0.4)))
+
     def build_plan(self, signal: Signal, equity: float) -> TradePlan:
         side = "BUY" if signal.direction > 0 else "SELL"
         stop_dist = self._stop_distance(signal)
-        risk_amount = equity * self.cfg.trading.risk_per_trade_pct / 100.0
+        # Risk-per-trade budget, optionally scaled down by confidence.
+        risk_amount = (
+            equity * self.cfg.trading.risk_per_trade_pct / 100.0
+            * self._confidence_factor(signal)
+        )
         # Units sized so that hitting the stop loses exactly `risk_amount`.
         quantity = risk_amount / stop_dist
 

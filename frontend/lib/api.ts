@@ -94,6 +94,8 @@ export const api = {
     ),
   scan: () => request<any>("/api/trading/scan"),
   universe: () => request<any>("/api/market/universe"),
+  edgeEval: (symbol: string, timeframe = "1d") =>
+    request<any>(`/api/research/edge?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&bars=1000`),
 };
 
 export function wsUrl(): string {

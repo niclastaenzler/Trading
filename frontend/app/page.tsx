@@ -38,6 +38,15 @@ export default function Dashboard() {
     setScanning(false);
   }
 
+  // Ehrliche Edge-Bewertung (Walk-Forward) für das aktuell gewählte Symbol.
+  const [edgeEval, setEdgeEval] = useState<any>(null);
+  const [edgeBusy, setEdgeBusy] = useState(false);
+  async function runEdge() {
+    setEdgeBusy(true);
+    try { setEdgeEval(await api.edgeEval(symbol)); } catch (e: any) { setEdgeEval({ ok: false, error: e.message }); }
+    setEdgeBusy(false);
+  }
+
   const refreshRef = useRef<() => void>(() => {});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -242,7 +251,7 @@ export default function Dashboard() {
         ) : (
           <table>
             <thead>
-              <tr><th>#</th><th>Symbol</th><th>Signal</th><th>Konfidenz</th><th>Preis</th><th>Status</th></tr>
+              <tr><th>#</th><th>Symbol</th><th>Signal</th><th>Konfidenz</th><th>Edge-Score</th><th>Regime</th><th>Status</th></tr>
             </thead>
             <tbody>
               {scan.slice(0, 25).map((o, i) => (
@@ -253,7 +262,8 @@ export default function Dashboard() {
                     {o.action === "BUY" ? "KAUF" : o.action === "SELL" ? "VERKAUF" : "—"}
                   </td>
                   <td>{(o.confidence * 100).toFixed(0)}%</td>
-                  <td>{o.price}</td>
+                  <td><b>{((o.edge_score ?? 0) * 100).toFixed(0)}</b></td>
+                  <td>{o.regime === "trend" ? "📈 Trend" : o.regime === "range" ? "↔ Seitwärts" : "—"}</td>
                   <td>
                     {o.actionable
                       ? <span className="pill on">handelbar</span>
@@ -263,6 +273,63 @@ export default function Dashboard() {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* Ehrliche Edge-Bewertung */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h3 className="row" style={{ justifyContent: "space-between" }}>
+          <span>🔬 Edge-Bewertung — {symbol} (Walk-Forward)</span>
+          <button className="secondary" onClick={runEdge} disabled={edgeBusy}>
+            {edgeBusy ? "Analysiere…" : "Edge prüfen"}
+          </button>
+        </h3>
+        <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 0 }}>
+          Ehrliche, robuste Auswertung: trainiert per Walk-Forward auf der Historie,
+          testet gegen Zufall &amp; Buy-and-Hold. Sagt klar, ob ein echter statistischer
+          Vorteil messbar ist.
+        </p>
+        {!edgeEval ? (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>
+            {edgeBusy ? "Rechne… (kann ein paar Sekunden dauern)" : "Auf »Edge prüfen« klicken."}
+          </p>
+        ) : edgeEval.ok === false ? (
+          <div className="banner">{edgeEval.error || edgeEval.reason || "Fehler"}</div>
+        ) : (
+          <>
+            <div className="banner" style={
+              edgeEval.has_edge
+                ? { borderColor: "var(--green)", color: "var(--green)", background: "rgba(46,204,113,.1)" }
+                : {}
+            }>
+              {edgeEval.has_edge ? "✅ " : "❌ "}{edgeEval.verdict} · {edgeEval.n_samples} Samples
+            </div>
+            <div className="row" style={{ gap: 24, marginTop: 8 }}>
+              <div><div style={{ color: "var(--muted)", fontSize: 12 }}>TREFFERQUOTE</div><b>{(edgeEval.significance.hit_rate * 100).toFixed(1)}%</b></div>
+              <div><div style={{ color: "var(--muted)", fontSize: 12 }}>SHARPE</div><b>{edgeEval.metrics.sharpe}</b></div>
+              <div><div style={{ color: "var(--muted)", fontSize: 12 }}>MAX DD</div><b className="neg">{(edgeEval.metrics.max_drawdown * 100).toFixed(1)}%</b></div>
+              <div><div style={{ color: "var(--muted)", fontSize: 12 }}>vs. ZUFALL (p)</div><b>{edgeEval.significance.mc_p_value}</b></div>
+              <div><div style={{ color: "var(--muted)", fontSize: 12 }}>BUY&amp;HOLD SHARPE</div><b>{edgeEval.buy_and_hold.sharpe}</b></div>
+            </div>
+            {edgeEval.feature_importance?.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>WICHTIGSTE FEATURES</div>
+                <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                  {edgeEval.feature_importance.slice(0, 6).map((f: any) => (
+                    <span key={f.feature} className="pill off" style={{ background: "var(--panel-2)", color: "var(--text)" }}>
+                      {f.feature}: {(f.importance * 100).toFixed(0)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>EMPFEHLUNGEN</div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                {edgeEval.recommendations.map((r: string, i: number) => <li key={i}>{r}</li>)}
+              </ul>
+            </div>
+          </>
         )}
       </div>
 
