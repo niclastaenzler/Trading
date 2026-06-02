@@ -33,9 +33,13 @@ services:
         generateValue: true
       - key: TRADINGVIEW_WEBHOOK_SECRET
         generateValue: true
-      # Ephemeral SQLite file (no external DB needed).
+      # Database — set by hand in the dashboard (sync:false so the blueprint
+      # never overrides a manual value). For persistence use the Supabase
+      # session-pooler URL with the +asyncpg driver, e.g.:
+      #   postgresql+asyncpg://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres
+      # For a throwaway/no-DB run you may instead set: sqlite+aiosqlite:////tmp/app.db
       - key: DATABASE_URL
-        value: sqlite+aiosqlite:////tmp/app.db
+        sync: false
       # In-process Redis fallback (no external Redis needed).
       - key: REDIS_URL
         value: memory
