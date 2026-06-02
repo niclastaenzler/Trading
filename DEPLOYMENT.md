@@ -6,7 +6,7 @@ This hosts the platform for real, all on free tiers, with auto-deploy on `git pu
   Browser
      │  https
      ▼
-  GitHub Pages  ──── static Next.js (this repo, /trading) ────┐
+  GitHub Pages  ──── static Next.js (this repo, /Trading) ────┐
      │  REST + WebSocket (https/wss)                          │ build-time:
      ▼                                                        │ NEXT_PUBLIC_API_URL
   Render  ──────── FastAPI (Docker, backend/) ────────────────┘
@@ -62,12 +62,14 @@ Keep this as your `DATABASE_URL` (note the `+asyncpg`).
    | Variable | Value |
    |---|---|
    | `NEXT_PUBLIC_API_URL` | your Render URL, e.g. `https://ai-trading-backend.onrender.com` |
-   | `PAGES_BASE_PATH` | `/trading` (only if your repo is named `trading`) |
+
+   > `PAGES_BASE_PATH` is derived automatically from the repo name (case-sensitive,
+   > e.g. `/Trading`). Only set it manually if you use a custom domain (empty).
 3. Run the **"Deploy frontend to GitHub Pages"** workflow (Actions tab →
    Run workflow), or just push to the branch.
-4. Your site goes live at:
+4. Your site goes live at — **note the capital T, the URL is case-sensitive**:
    ```
-   https://niclastaenzler.github.io/trading/
+   https://niclastaenzler.github.io/Trading/
    ```
 
 Open it, register (first account = **owner**), and you're in — paper mode,

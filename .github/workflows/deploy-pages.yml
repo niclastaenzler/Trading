@@ -40,7 +40,10 @@ jobs:
       - name: Build static export
         env:
           BUILD_TARGET: static
-          PAGES_BASE_PATH: ${{ vars.PAGES_BASE_PATH || '/trading' }}
+          # Auto-derive the base path from the (case-sensitive!) repo name so it
+          # always matches the Pages URL /<repo>/. Override via the optional
+          # PAGES_BASE_PATH repo variable (e.g. empty for a custom domain).
+          PAGES_BASE_PATH: ${{ vars.PAGES_BASE_PATH || format('/{0}', github.event.repository.name) }}
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
         run: |
           npm run build
