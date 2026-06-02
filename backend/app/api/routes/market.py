@@ -12,7 +12,7 @@ from app.api.deps import get_current_user
 from app.core.encryption import decrypt
 from app.models.user import User
 from app.services.broker import get_broker
-from app.services.market_data import fetch_ohlcv
+from app.services.market_data import _RESOLUTION, fetch_ohlcv
 from app.services.universe import UNIVERSE, all_symbols
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -44,30 +44,46 @@ async def candles(
 ):
     """OHLCV candles for `symbol`. Uses the user's broker feed when available
     (e.g. Capital.com), otherwise a synthetic series so the chart always renders.
-    Returns rows shaped for TradingView Lightweight-Charts (time in epoch secs)."""
+    Returns the data SOURCE so the dashboard can show whether it is live broker
+    data or the synthetic fallback. Times are epoch seconds (UTC)."""
     broker = _user_broker(user)
+    df = None
+    source = "synthetic"
     try:
         await broker.connect()
+        live = await broker.get_candles(
+            symbol, resolution=_RESOLUTION.get(timeframe, "HOUR"), limit=min(bars, 500)
+        )
+        if live is not None and len(live) >= 30:
+            df, source = live, broker.name
     except Exception:
-        pass
-    try:
-        df = await fetch_ohlcv(symbol, bars=min(bars, 500), broker=broker, timeframe=timeframe)
-    except Exception:
-        df = await fetch_ohlcv(symbol, bars=min(bars, 500))
+        df = None
     finally:
         if hasattr(broker, "aclose"):
             await broker.aclose()
 
+    if df is None:
+        df = await fetch_ohlcv(symbol, bars=min(bars, 500))  # synthetic fallback
+        source = "synthetic"
+
     out = []
     idx = df.index
-    for i, (_, row) in enumerate(df.iterrows()):
+    for i in range(len(df)):
+        row = df.iloc[i]
         ts = idx[i]
-        t = int(pd.Timestamp(ts).timestamp()) if not isinstance(ts, (int, float)) else int(ts)
+        if isinstance(ts, (int, float)):
+            t = int(ts)
+        else:
+            ts = pd.Timestamp(ts)
+            if ts.tzinfo is None:  # broker times are UTC — localize so epoch is correct
+                ts = ts.tz_localize("UTC")
+            t = int(ts.timestamp())
         o, h, l, c = (float(row["open"]), float(row["high"]),
                       float(row["low"]), float(row["close"]))
         if any(math.isnan(v) for v in (o, h, l, c)):
             continue
         out.append({"time": t, "open": o, "high": h, "low": l, "close": c})
+
     # Lightweight-charts requires strictly ascending, unique timestamps.
     seen, clean = set(), []
     for r in out:
@@ -75,4 +91,7 @@ async def candles(
             r["time"] = (clean[-1]["time"] + 1) if clean else r["time"]
         seen.add(r["time"])
         clean.append(r)
-    return {"symbol": symbol, "timeframe": timeframe, "candles": clean}
+    return {
+        "symbol": symbol, "timeframe": timeframe,
+        "source": source, "live": source != "synthetic", "candles": clean,
+    }

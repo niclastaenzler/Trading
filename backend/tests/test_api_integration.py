@@ -137,6 +137,19 @@ async def test_model_status_and_training(owner_client):
     assert len(st.json()["feature_importance"]) > 0
 
 
+async def test_candles_report_data_source(owner_client):
+    res = await owner_client.get("/api/market/candles?symbol=EURUSD&timeframe=1h&bars=120")
+    assert res.status_code == 200
+    data = res.json()
+    assert "source" in data and "live" in data
+    # Paper broker has no candle feed -> synthetic fallback, flagged honestly.
+    assert data["source"] == "synthetic" and data["live"] is False
+    assert len(data["candles"]) > 0
+    # Strictly ascending unique timestamps (chart requirement).
+    times = [c["time"] for c in data["candles"]]
+    assert times == sorted(times) and len(times) == len(set(times))
+
+
 async def test_config_exposes_edge_settings(owner_client):
     res = await owner_client.get("/api/config")
     cfg = res.json()["config"]

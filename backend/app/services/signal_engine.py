@@ -45,15 +45,21 @@ def _trend_direction(row) -> int:
     return 0
 
 
+def _edge_score(confidence: float, ctx: dict) -> float:
+    """Blend confidence with trend strength and a volatility penalty (0..1) so
+    the best setups rank highest. Computed for ALL signals (also rejected ones)."""
+    ts = ctx["trend_strength"]
+    vol_factor = max(0.0, 1.0 - ctx["volatility_percentile"])  # calmer = higher
+    return round(confidence * (0.5 + 0.5 * ts) * (0.5 + 0.5 * vol_factor), 4)
+
+
 def _apply_edge_layer(
     confidence: float, ctx: dict, edge: EdgeSettings
 ) -> tuple[bool, float, str]:
-    """Return (passes, edge_score, reason). edge_score blends confidence with
-    trend strength and a volatility penalty so the best setups rank highest."""
+    """Return (passes, edge_score, reason)."""
     ts = ctx["trend_strength"]
     volp = ctx["volatility_percentile"]
-    vol_factor = max(0.0, 1.0 - volp)  # calmer markets score higher
-    edge_score = round(confidence * (0.5 + 0.5 * ts) * (0.5 + 0.5 * vol_factor), 4)
+    edge_score = _edge_score(confidence, ctx)
 
     if not edge.enabled:
         return True, edge_score, ""
@@ -117,16 +123,20 @@ def generate_signal(
     total_w = sum(w for _, w in votes) or 1.0
     direction = 1 if net > 0 else (-1 if net < 0 else 0)
     confidence = round(abs(net) / total_w, 4)
+    # Always-computed ranking score (also for rejected setups), so the scan shows
+    # a meaningful gradient instead of zeros.
+    base_score = _edge_score(confidence, ctx)
+    components["edge_score"] = base_score
 
     # Trend gate.
     if strategy.trend_filter_enabled and trend != 0 and direction != trend:
         components["vetoed_by_trend"] = True
-        return Signal(symbol, 0, confidence, price, atr_val, 0.0, components)
+        return Signal(symbol, 0, confidence, price, atr_val, base_score, components)
 
     # Confidence gate.
     if confidence < strategy.signal_confidence_threshold:
         components["below_threshold"] = True
-        return Signal(symbol, 0, confidence, price, atr_val, 0.0, components)
+        return Signal(symbol, 0, confidence, price, atr_val, base_score, components)
 
     # Edge layer: selective trading + ranking score.
     edge = edge or EdgeSettings()

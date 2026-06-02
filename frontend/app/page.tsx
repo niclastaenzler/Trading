@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [timeframe, setTimeframe] = useState("1h");
   const [candles, setCandles] = useState<any[]>([]);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
+  const [candleSource, setCandleSource] = useState<{ source: string; live: boolean } | null>(null);
 
   // KI-Marktanalyse (portfolio scan).
   const [scan, setScan] = useState<any[]>([]);
@@ -80,9 +81,11 @@ export default function Dashboard() {
     try {
       const r = await api.candles(symbol, timeframe, 200);
       setCandles(r.candles || []);
+      setCandleSource({ source: r.source, live: r.live });
       if (r.candles?.length) setLastPrice(r.candles[r.candles.length - 1].close);
     } catch {
       setCandles([]);
+      setCandleSource(null);
     }
   }
 
@@ -257,7 +260,14 @@ export default function Dashboard() {
       {/* Live Trading View */}
       <div className="card" style={{ marginBottom: 16 }}>
         <h3 className="row" style={{ justifyContent: "space-between" }}>
-          <span>Live-Trading-Ansicht — {symbol} {lastPrice ? `· ${lastPrice}` : ""}</span>
+          <span>
+            Live-Trading-Ansicht — {symbol} {lastPrice ? `· ${lastPrice}` : ""}
+            {candleSource && (
+              <span className={`pill ${candleSource.live ? "on" : "off"}`} style={{ marginLeft: 10, fontSize: 11 }}>
+                {candleSource.live ? `● ${candleSource.source}` : "simuliert"}
+              </span>
+            )}
+          </span>
           <span className="row">
             <select value={symbol} onChange={(e) => setSymbol(e.target.value)} style={{ width: "auto" }}>
               {symbolOptions.map((s) => <option key={s} value={s}>{s}</option>)}
