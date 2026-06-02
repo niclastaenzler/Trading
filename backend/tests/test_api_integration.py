@@ -137,6 +137,15 @@ async def test_model_status_and_training(owner_client):
     assert len(st.json()["feature_importance"]) > 0
 
 
+async def test_explain_reasoning(owner_client):
+    res = await owner_client.get("/api/trading/explain?symbol=EURUSD")
+    assert res.status_code == 200
+    d = res.json()
+    assert "decision_chain" in d and len(d["decision_chain"]) == 3
+    assert "regime" in d and "confidence" in d and "edge_score" in d
+    assert "action" in d
+
+
 async def test_candles_report_data_source(owner_client):
     res = await owner_client.get("/api/market/candles?symbol=EURUSD&timeframe=1h&bars=120")
     assert res.status_code == 200

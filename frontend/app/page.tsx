@@ -10,6 +10,23 @@ const CandleChart = dynamic(() => import("@/app/components/CandleChart"), { ssr:
 
 const TIMEFRAMES = ["5m", "15m", "1h", "4h", "1d"];
 
+// Small horizontal bar (0..1) for visualising the AI's reasoning.
+function Bar({ value, color = "var(--accent)", label }: { value: number; color?: string; label?: string }) {
+  const pct = Math.max(0, Math.min(100, value * 100));
+  return (
+    <div style={{ margin: "4px 0" }}>
+      {label && (
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)" }}>
+          <span>{label}</span><span className="mono">{pct.toFixed(0)}%</span>
+        </div>
+      )}
+      <div style={{ height: 8, background: "var(--panel-2)", borderRadius: 6, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width .3s" }} />
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [perf, setPerf] = useState<any>(null);
@@ -29,6 +46,10 @@ export default function Dashboard() {
   const [candles, setCandles] = useState<any[]>([]);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
   const [candleSource, setCandleSource] = useState<{ source: string; live: boolean } | null>(null);
+
+  // KI-Denkweise (Reasoning) für das gewählte Symbol.
+  const [think, setThink] = useState<any>(null);
+  async function loadThink() { try { setThink(await api.explain(symbol)); } catch { setThink(null); } }
 
   // KI-Marktanalyse (portfolio scan).
   const [scan, setScan] = useState<any[]>([]);
@@ -127,6 +148,7 @@ export default function Dashboard() {
   // Load + auto-refresh the chart (every 30s) and when symbol/timeframe change.
   useEffect(() => {
     loadCandles();
+    loadThink();
     const id = setInterval(loadCandles, 30000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -281,6 +303,81 @@ export default function Dashboard() {
         {candles.length ? <CandleChart data={candles} /> : <p style={{ color: "var(--muted)" }}>Lade Kurse…</p>}
         <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 0 }}>
           Aktualisiert automatisch alle 30 s. Datenquelle: dein verbundener Broker (sonst simuliert).
+        </p>
+      </div>
+
+      {/* KI-Denkweise (Reasoning) */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h3 className="row" style={{ justifyContent: "space-between" }}>
+          <span>🧠 KI-Denkweise — {symbol}</span>
+          <button className="secondary" onClick={loadThink}>↻</button>
+        </h3>
+        {!think ? (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Lade KI-Begründung…</p>
+        ) : (
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+            {/* 1. KI-Wahrscheinlichkeiten */}
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 6 }}>KI-WAHRSCHEINLICHKEIT</div>
+              {think.ai ? (
+                <>
+                  <Bar label="Kaufen" value={think.ai.probabilities?.buy ?? 0} color="var(--green)" />
+                  <Bar label="Verkaufen" value={think.ai.probabilities?.sell ?? 0} color="var(--red)" />
+                  <Bar label="Halten" value={think.ai.probabilities?.hold ?? 0} color="var(--muted)" />
+                </>
+              ) : <p style={{ color: "var(--muted)", fontSize: 12 }}>KI-Modell deaktiviert.</p>}
+            </div>
+
+            {/* 2. Komponenten */}
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 6 }}>KOMPONENTEN (Stimmen)</div>
+              <div style={{ fontSize: 13, lineHeight: 1.9 }}>
+                <div>🤖 KI: <b className={think.ai?.direction > 0 ? "pos" : think.ai?.direction < 0 ? "neg" : ""}>
+                  {think.ai ? (think.ai.direction > 0 ? "Kauf" : think.ai.direction < 0 ? "Verkauf" : "neutral") : "—"}</b>
+                  {think.ai ? ` (${(think.ai.confidence * 100).toFixed(0)}%)` : ""}</div>
+                <div>📊 Muster: <b>{think.pattern?.name || "—"}</b>
+                  {think.pattern ? ` (${(think.pattern.strength * 100).toFixed(0)}%)` : ""}</div>
+                <div>📈 Trend: <b className={think.trend > 0 ? "pos" : think.trend < 0 ? "neg" : ""}>
+                  {think.trend > 0 ? "aufwärts" : think.trend < 0 ? "abwärts" : "seitwärts"}</b></div>
+                {think.sentiment != null && <div>📰 Sentiment: <b>{think.sentiment}</b></div>}
+              </div>
+            </div>
+
+            {/* 3. Marktregime */}
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 6 }}>MARKTREGIME</div>
+              <Bar label="Trendstärke" value={think.regime?.trend_strength ?? 0} color="var(--accent)" />
+              <Bar label="Volatilität (Perzentil)" value={think.regime?.volatility_percentile ?? 0} color="#e0a13c" />
+              <div style={{ fontSize: 13, marginTop: 6 }}>
+                Regime: <b>{think.regime?.regime === "trend" ? "📈 Trend" : "↔ Seitwärts"}</b>
+                {think.regime?.higher_high && " · höheres Hoch"}
+                {think.regime?.lower_low && " · tieferes Tief"}
+              </div>
+            </div>
+
+            {/* 4. Entscheidungs-Kette */}
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 6 }}>ENTSCHEIDUNG</div>
+              <div className="row" style={{ marginBottom: 6 }}>
+                <span className={`pill ${think.actionable ? "on" : "off"}`}>
+                  {think.action} {think.actionable ? "✓ handelbar" : "kein Trade"}
+                </span>
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.8 }}>
+                {think.decision_chain.map((s: any, i: number) => (
+                  <div key={i}>
+                    <span style={{ color: s.ok ? "var(--green)" : "var(--red)" }}>{s.ok ? "✓" : "✗"}</span>{" "}
+                    {s.step} <span style={{ color: "var(--muted)", fontSize: 12 }}>· {s.detail}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 4 }}>Edge-Score: <b>{(think.edge_score * 100).toFixed(0)}</b> / 100</div>
+              </div>
+            </div>
+          </div>
+        )}
+        <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 10, marginBottom: 0 }}>
+          So „denkt" die KI: Sie kombiniert die KI-Wahrscheinlichkeit, Muster und Trend zu einer
+          Konfidenz, prüft Marktregime/Volatilität und entscheidet über die Entscheidungs-Kette.
         </p>
       </div>
 

@@ -16,8 +16,11 @@ from app.models.config import TradingConfig
 from app.models.user import User
 from app.schemas.signal import PendingConfirm
 from app.services.broker import get_broker
+from app.services.config_defaults import TradingConfigModel
 from app.services.market_data import fetch_ohlcv
 from app.services.risk_manager import TradePlan
+from app.services.sentiment import get_sentiment
+from app.services.signal_engine import generate_signal
 from app.services.trading_engine import TradingEngine
 
 router = APIRouter(prefix="/api/trading", tags=["trading"])
@@ -202,3 +205,53 @@ async def close_position(
     await broker.connect()
     engine = TradingEngine(db, user.id, cfg, broker)
     return await engine.close_position(symbol, reason="manual")
+
+
+@router.get("/explain")
+async def explain(
+    symbol: str = "EURUSD",
+    cfg: TradingConfig = Depends(get_user_config),
+    user: User = Depends(get_current_user),
+):
+    """Expose HOW the AI reached its decision for one symbol — every component
+    (AI probabilities, pattern, trend, regime) and which gates passed/failed."""
+    model = TradingConfigModel(**(cfg.data or {}))
+    broker = _build_broker(user)
+    try:
+        await broker.connect()
+    except Exception:
+        pass
+    try:
+        df = await fetch_ohlcv(symbol, bars=200, broker=broker, timeframe="1h")
+        sent = await get_sentiment(symbol) if model.strategy.use_sentiment else 0.0
+    finally:
+        if hasattr(broker, "aclose"):
+            await broker.aclose()
+
+    sig = generate_signal(symbol, df, model.strategy, model.edge, sent)
+    c = sig.components or {}
+
+    # Decision chain (what the engine checked, in order).
+    chain = [
+        {"step": "Konfidenz-Schwelle", "ok": not c.get("below_threshold"),
+         "detail": f"{sig.confidence:.0%} vs. {model.strategy.signal_confidence_threshold:.0%}"},
+        {"step": "Trendfilter", "ok": not c.get("vetoed_by_trend"),
+         "detail": "gegen Trend" if c.get("vetoed_by_trend") else "im Trend / aus"},
+        {"step": "Edge-Layer", "ok": not c.get("edge_rejected"),
+         "detail": c.get("edge_rejected") or f"Edge-Score {sig.edge_score:.2f}"},
+    ]
+    return {
+        "symbol": symbol,
+        "price": round(sig.price, 6),
+        "direction": sig.direction,
+        "action": "KAUF" if sig.direction > 0 else ("VERKAUF" if sig.direction < 0 else "—"),
+        "confidence": round(sig.confidence, 4),
+        "edge_score": round(sig.edge_score, 4),
+        "actionable": sig.actionable,
+        "ai": c.get("ai"),
+        "pattern": c.get("pattern"),
+        "trend": c.get("trend"),
+        "regime": c.get("regime"),
+        "sentiment": c.get("sentiment"),
+        "decision_chain": chain,
+    }

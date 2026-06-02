@@ -93,6 +93,8 @@ export const api = {
       `/api/market/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&bars=${bars}`
     ),
   scan: () => request<any>("/api/trading/scan"),
+  explain: (symbol: string) =>
+    request<any>(`/api/trading/explain?symbol=${encodeURIComponent(symbol)}`),
   universe: () => request<any>("/api/market/universe"),
   edgeEval: (symbol: string, timeframe = "1d") =>
     request<any>(`/api/research/edge?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&bars=1000`),
