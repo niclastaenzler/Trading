@@ -50,10 +50,10 @@ export const api = {
     setToken(data.access_token);
     return data;
   },
-  register: (email: string, password: string) =>
+  register: (email: string, password: string, inviteCode?: string) =>
     request("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, invite_code: inviteCode || null }),
     }),
   me: () => request<any>("/api/auth/me"),
   getConfig: () => request<any>("/api/config"),
@@ -80,6 +80,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ symbol, bars }),
     }),
+  positions: () => request<any[]>("/api/trades/positions"),
+  closePosition: (symbol: string) =>
+    request<any>(`/api/trading/close/${encodeURIComponent(symbol)}`, { method: "POST" }),
+  brokerStatus: () => request<any>("/api/trades/broker"),
+  setBroker: (creds: any) =>
+    request<any>("/api/trades/broker", { method: "POST", body: JSON.stringify(creds) }),
+  testBroker: () => request<any>("/api/trades/broker/test", { method: "POST" }),
 };
 
 export function wsUrl(): string {

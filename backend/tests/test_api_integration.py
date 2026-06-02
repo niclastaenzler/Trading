@@ -21,6 +21,23 @@ async def test_register_first_user_is_owner(client):
     assert res2.json()["role"] == "viewer"
 
 
+async def test_registration_requires_invite_code_when_configured(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "registration_invite_code", "let-me-in")
+    # Missing/wrong code is rejected.
+    bad = await client.post(
+        "/api/auth/register", json={"email": "x@test.io", "password": "pw123456"}
+    )
+    assert bad.status_code == 403
+    # Correct code is accepted.
+    good = await client.post(
+        "/api/auth/register",
+        json={"email": "x@test.io", "password": "pw123456", "invite_code": "let-me-in"},
+    )
+    assert good.status_code == 201
+
+
 async def test_login_and_me(owner_client):
     res = await owner_client.get("/api/auth/me")
     assert res.status_code == 200

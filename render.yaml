@@ -42,7 +42,11 @@ services:
       # Frontend origin allowed by CORS (GitHub Pages, origin only — no path).
       - key: CORS_ORIGINS
         value: https://niclastaenzler.github.io
-      # --- the ONLY secret to set by hand in the Render dashboard ---
+      # --- set by hand in the Render dashboard ---
       # Fernet key: python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())"
       - key: ENCRYPTION_KEY
+        sync: false
+      # Invite code required to register (protects the public instance). Pick any
+      # secret phrase; you enter it on the registration form.
+      - key: REGISTRATION_INVITE_CODE
         sync: false

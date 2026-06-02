@@ -21,6 +21,7 @@ export default function Nav() {
     { href: "/config", label: "Configuration" },
     { href: "/trades", label: "Trades" },
     { href: "/backtest", label: "Backtest" },
+    { href: "/settings", label: "Settings" },
   ];
 
   return (

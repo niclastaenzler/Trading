@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [perf, setPerf] = useState<any>(null);
   const [cfg, setCfg] = useState<any>(null);
   const [pending, setPending] = useState<any[]>([]);
+  const [positions, setPositions] = useState<any[]>([]);
+  const [recentTrades, setRecentTrades] = useState<any[]>([]);
   const [feed, setFeed] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [live, setLive] = useState(false);
@@ -27,6 +29,16 @@ export default function Dashboard() {
     setPerf(await api.performance());
     setCfg(await api.getConfig());
     setPending((await api.pending()).pending || []);
+    try {
+      setPositions(await api.positions());
+    } catch {
+      setPositions([]);
+    }
+    try {
+      setRecentTrades((await api.trades()).slice(0, 5));
+    } catch {
+      setRecentTrades([]);
+    }
   }
   refreshRef.current = refresh;
 
@@ -93,6 +105,12 @@ export default function Dashboard() {
   async function decide(symbol: string, approve: boolean) {
     await api.confirm(symbol, approve);
     await refresh();
+  }
+  async function close(symbol: string) {
+    setBusy(true);
+    await api.closePosition(symbol);
+    await refresh();
+    setBusy(false);
   }
 
   if (!perf || !cfg) return <p>Loading…</p>;
@@ -197,6 +215,67 @@ export default function Dashboard() {
           </table>
         </div>
       )}
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3>Open positions ({positions.length})</h3>
+        {positions.length === 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>
+            No open positions. Trades appear here once the engine opens one —
+            enable <b>auto-trading</b> and hit <b>Run cycle now</b> (in semi-auto,
+            approve the pending trade above), or connect a broker under{" "}
+            <b>Settings</b>.
+          </p>
+        ) : (
+          <table>
+            <thead>
+              <tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Now</th><th>uPnL</th><th>SL</th><th>TP</th><th></th></tr>
+            </thead>
+            <tbody>
+              {positions.map((p, i) => (
+                <tr key={i}>
+                  <td>{p.symbol}</td>
+                  <td>{p.side}</td>
+                  <td>{p.quantity}</td>
+                  <td>{p.entry_price}</td>
+                  <td>{p.current_price}</td>
+                  <td className={p.unrealized_pnl >= 0 ? "pos" : "neg"}>{p.unrealized_pnl}</td>
+                  <td>{p.stop_loss ?? "—"}</td>
+                  <td>{p.take_profit ?? "—"}</td>
+                  <td><button className="danger" onClick={() => close(p.symbol)} disabled={busy}>Close</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 className="row" style={{ justifyContent: "space-between" }}>
+          <span>Recent trades</span>
+          <a href="/Trading/trades/" style={{ fontSize: 13 }}>View all →</a>
+        </h3>
+        {recentTrades.length === 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>No trades yet.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {recentTrades.map((t) => (
+                <tr key={t.id}>
+                  <td>{t.symbol}</td>
+                  <td>{t.side}</td>
+                  <td>{t.entry_price}</td>
+                  <td>{t.exit_price ?? "—"}</td>
+                  <td className={t.pnl >= 0 ? "pos" : "neg"}>{t.pnl?.toFixed?.(2) ?? "—"}</td>
+                  <td><span className={`pill ${t.status === "OPEN" ? "on" : "off"}`}>{t.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       <div className="card" style={{ marginTop: 16 }}>
         <h3 className="row" style={{ justifyContent: "space-between" }}>

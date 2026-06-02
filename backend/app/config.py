@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     # Fernet key for encrypting broker credentials at rest.
     encryption_key: str = ""
+    # If set, registration requires this invite code (protects a public instance).
+    registration_invite_code: str = ""
 
     # --- Database / cache ---
     database_url: str = "postgresql+asyncpg://trading:trading@localhost:5432/trading"

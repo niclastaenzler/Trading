@@ -8,6 +8,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
 
@@ -16,7 +17,7 @@ export default function LoginPage() {
     setError("");
     try {
       if (isRegister) {
-        await api.register(email, password);
+        await api.register(email, password, inviteCode);
       }
       await api.login(email, password);
       router.push("/");
@@ -42,6 +43,17 @@ export default function LoginPage() {
           type="password"
           required
         />
+        {isRegister && (
+          <>
+            <label>Invite code</label>
+            <input
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              type="text"
+              placeholder="required if the instance is protected"
+            />
+          </>
+        )}
         <button style={{ marginTop: 16, width: "100%" }} type="submit">
           {isRegister ? "Register" : "Login"}
         </button>

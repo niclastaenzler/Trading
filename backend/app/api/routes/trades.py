@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_owner
 from app.core.database import get_db
-from app.core.encryption import encrypt
+from app.core.encryption import decrypt, encrypt
 from app.models.trade import Order, Trade
 from app.models.user import User
 from app.schemas.trade import (
@@ -132,3 +132,63 @@ async def set_broker(
     await log_audit(db, event="BROKER_CONFIGURED", user_id=user.id,
                     message=f"broker set to {body.broker} (demo={body.demo})")
     return {"broker": user.broker_name, "demo": body.demo}
+
+
+def _build_user_broker(user: User):
+    """Construct the user's configured broker with decrypted credentials."""
+    creds = {}
+    if user.broker_credentials_enc:
+        try:
+            creds = json.loads(decrypt(user.broker_credentials_enc))
+        except ValueError:
+            creds = {}
+    return get_broker(user.id, user.broker_name, creds)
+
+
+@router.get("/broker")
+async def broker_status(user: User = Depends(get_current_user)):
+    """Current broker selection (no secrets returned)."""
+    return {
+        "broker": user.broker_name,
+        "configured": bool(user.broker_credentials_enc) or user.broker_name == "paper",
+    }
+
+
+@router.post("/broker/test")
+async def broker_test(user: User = Depends(require_owner)):
+    """Try to connect to the configured broker and read the balance."""
+    broker = _build_user_broker(user)
+    try:
+        await broker.connect()
+        balance = await broker.get_balance()
+        return {"ok": True, "broker": broker.name, "is_paper": broker.is_paper,
+                "balance": round(float(balance), 2)}
+    except Exception as exc:  # surface a readable reason to the UI
+        return {"ok": False, "broker": broker.name, "error": str(exc)[:300]}
+    finally:
+        if hasattr(broker, "aclose"):
+            await broker.aclose()
+
+
+@router.get("/positions")
+async def open_positions(user: User = Depends(get_current_user)):
+    """Live open positions from the active broker."""
+    broker = _build_user_broker(user)
+    try:
+        await broker.connect()
+        positions = await broker.get_positions()
+        return [
+            {
+                "symbol": p.symbol, "side": p.side, "quantity": p.quantity,
+                "entry_price": round(p.entry_price, 6),
+                "current_price": round(p.current_price, 6),
+                "unrealized_pnl": round(p.unrealized_pnl, 2),
+                "stop_loss": p.stop_loss, "take_profit": p.take_profit,
+            }
+            for p in positions
+        ]
+    except Exception:
+        return []
+    finally:
+        if hasattr(broker, "aclose"):
+            await broker.aclose()

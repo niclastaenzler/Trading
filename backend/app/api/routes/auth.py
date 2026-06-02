@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.config import settings
 from app.core.database import get_db
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.config import TradingConfig
@@ -21,6 +22,11 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserOut, status_code=201)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    # Protect a public instance: if an invite code is configured, require it.
+    if settings.registration_invite_code:
+        if (body.invite_code or "") != settings.registration_invite_code:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid or missing invite code")
+
     existing = await db.execute(select(User).where(User.email == body.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
