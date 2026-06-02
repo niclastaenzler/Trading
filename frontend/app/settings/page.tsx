@@ -59,48 +59,48 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h2>Settings — Broker</h2>
+      <h2>Einstellungen — Broker</h2>
       {msg && (
         <div className="banner" style={{ borderColor: "var(--green)", color: "var(--green)", background: "rgba(46,204,113,.1)" }}>{msg}</div>
       )}
       {err && <div className="banner">{err}</div>}
 
       <div className="card">
-        <h3>Active broker</h3>
+        <h3>Aktiver Broker</h3>
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
-          Current: <b>{status?.broker || "…"}</b>{" "}
-          {status?.configured ? "✓ configured" : "— not configured"}
+          Aktuell: <b>{status?.broker || "…"}</b>{" "}
+          {status?.configured ? "✓ konfiguriert" : "— nicht konfiguriert"}
         </p>
 
         <label>Broker</label>
         <select value={broker} onChange={(e) => setBroker(e.target.value)}>
-          <option value="paper">Paper (simulated, safe default)</option>
-          <option value="capital_com">Capital.com (live/demo API)</option>
+          <option value="paper">Paper (simuliert, sicherer Standard)</option>
+          <option value="capital_com">Capital.com (Live-/Demo-API)</option>
         </select>
 
         {broker === "capital_com" && (
           <fieldset className="fieldset" style={{ marginTop: 16 }}>
-            <legend>Capital.com credentials</legend>
+            <legend>Capital.com Zugangsdaten</legend>
             <p style={{ color: "var(--muted)", fontSize: 13 }}>
-              Generate an API key in Capital.com → <i>Settings → API integrations</i>.
-              Stored encrypted. Keep <b>Demo</b> on until you have validated behaviour.
+              API-Schlüssel in Capital.com unter <i>Settings → API integrations</i> erzeugen.
+              Wird verschlüsselt gespeichert. <b>Demo</b> aktiviert lassen, bis alles getestet ist.
             </p>
-            <label>API key</label>
+            <label>API-Schlüssel</label>
             <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" />
-            <label>Identifier (login email)</label>
+            <label>Identifier (Login-E-Mail)</label>
             <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} />
-            <label>Password (API password)</label>
+            <label>Passwort (API-Passwort)</label>
             <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" />
             <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>
               <input type="checkbox" style={{ width: "auto" }} checked={demo} onChange={(e) => setDemo(e.target.checked)} />
-              Use Demo environment (recommended)
+              Demo-Umgebung verwenden (empfohlen)
             </label>
           </fieldset>
         )}
 
         <div className="row" style={{ marginTop: 16 }}>
-          <button onClick={save} disabled={busy}>Save broker</button>
-          <button className="secondary" onClick={runTest} disabled={busy}>Test connection</button>
+          <button onClick={save} disabled={busy}>Broker speichern</button>
+          <button className="secondary" onClick={runTest} disabled={busy}>Verbindung testen</button>
         </div>
 
         {test && (
@@ -110,15 +110,15 @@ export default function SettingsPage() {
               : { marginTop: 16 }
           }>
             {test.ok
-              ? `✓ Connected to ${test.broker} (${test.is_paper ? "demo/paper" : "LIVE"}) — balance ${test.balance}`
-              : `✗ Connection failed: ${test.error}`}
+              ? `✓ Verbunden mit ${test.broker} (${test.is_paper ? "Demo/Paper" : "LIVE"}) — Kontostand ${test.balance}`
+              : `✗ Verbindung fehlgeschlagen: ${test.error}`}
           </div>
         )}
       </div>
 
       <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 16 }}>
-        Note: connecting a live broker does not start trading. You still control
-        everything via auto-trading toggle, manual confirmation and the kill switch.
+        Hinweis: Einen Live-Broker zu verbinden startet noch keinen Handel. Du steuerst
+        alles über den Auto-Handel-Schalter, die manuelle Bestätigung und den Not-Aus.
       </p>
     </div>
   );

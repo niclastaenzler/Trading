@@ -39,10 +39,50 @@ export default function ConfigPage() {
     try {
       const res: any = await api.updateConfig(cfg);
       setCfg(res.config); // reflect server-side clamping (compliance envelope)
-      setMsg("Saved. Values reflect the enforced compliance envelope.");
+      setMsg("Gespeichert. Die Werte spiegeln die erzwungene Compliance-Hülle wider.");
     } catch (e: any) {
       setErr(e.message);
     }
+  }
+
+  // Voreingestellte Trading-Profile. Nach dem Anwenden noch „Speichern" klicken;
+  // das Backend klemmt zu riskante Werte über die Compliance-Hülle automatisch.
+  const PRESETS: Record<string, any> = {
+    Konservativ: {
+      "trading.risk_per_trade_pct": 0.5, "trading.max_open_positions": 2,
+      "strategy.signal_confidence_threshold": 0.75,
+      "automation.manual_confirmation": true, "automation.max_trades_per_hour": 2,
+      "automation.max_trades_per_day": 4, "automation.cooldown_seconds": 600,
+      "risk.stop_loss_value": 1.5, "risk.take_profit_rr": 2.0,
+      "risk.daily_loss_limit_pct": 2.0, "risk.max_drawdown_pct": 8.0,
+      "compliance.compliance_mode": true,
+    },
+    Ausgewogen: {
+      "trading.risk_per_trade_pct": 1.0, "trading.max_open_positions": 3,
+      "strategy.signal_confidence_threshold": 0.65,
+      "automation.manual_confirmation": true, "automation.max_trades_per_hour": 4,
+      "automation.max_trades_per_day": 10, "automation.cooldown_seconds": 300,
+      "risk.stop_loss_value": 1.5, "risk.take_profit_rr": 2.0,
+      "risk.daily_loss_limit_pct": 3.0, "risk.max_drawdown_pct": 10.0,
+      "compliance.compliance_mode": true,
+    },
+    Aggressiv: {
+      "trading.risk_per_trade_pct": 1.0, "trading.max_open_positions": 5,
+      "strategy.signal_confidence_threshold": 0.6,
+      "automation.manual_confirmation": false, "automation.max_trades_per_hour": 6,
+      "automation.max_trades_per_day": 20, "automation.cooldown_seconds": 60,
+      "risk.stop_loss_value": 1.0, "risk.take_profit_rr": 1.5,
+      "risk.daily_loss_limit_pct": 5.0, "risk.max_drawdown_pct": 12.0,
+      "compliance.compliance_mode": true,
+    },
+  };
+  function applyPreset(name: string) {
+    let next = cfg;
+    for (const [path, value] of Object.entries(PRESETS[name])) {
+      next = setPath(next, path, value);
+    }
+    setCfg(next);
+    setMsg(`Profil „${name}" übernommen — jetzt unten „Speichern" klicken.`);
   }
 
   const N = (label: string, path: string, step = "any") => {
@@ -71,17 +111,30 @@ export default function ConfigPage() {
 
   return (
     <div>
-      <h2>Configuration</h2>
+      <h2>Konfiguration</h2>
       {msg && <div className="banner" style={{ borderColor: "var(--green)", color: "var(--green)", background: "rgba(46,204,113,.1)" }}>{msg}</div>}
       {err && <div className="banner">{err}</div>}
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h3>Voreinstellungen (Trading-Profile)</h3>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
+          Schnellstart-Profile. Nach dem Anwenden unten „Speichern" klicken. Zu riskante
+          Werte werden durch die Compliance-Hülle automatisch begrenzt.
+        </p>
+        <div className="row">
+          <button className="secondary" onClick={() => applyPreset("Konservativ")}>🛡️ Konservativ</button>
+          <button className="secondary" onClick={() => applyPreset("Ausgewogen")}>⚖️ Ausgewogen</button>
+          <button className="secondary" onClick={() => applyPreset("Aggressiv")}>🔥 Aggressiv</button>
+        </div>
+      </div>
 
       <fieldset className="fieldset">
         <legend>Trading</legend>
         <div className="grid">
-          {N("Risk per trade (%)", "trading.risk_per_trade_pct")}
-          {N("Max open positions", "trading.max_open_positions", "1")}
+          {N("Risiko pro Trade (%)", "trading.risk_per_trade_pct")}
+          {N("Max. offene Positionen", "trading.max_open_positions", "1")}
           <div>
-            <label>Allowed symbols (comma separated)</label>
+            <label>Erlaubte Symbole (durch Komma getrennt)</label>
             <input
               value={(cfg.trading.allowed_symbols || []).join(",")}
               onChange={(e) => upd("trading.allowed_symbols", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
@@ -91,69 +144,69 @@ export default function ConfigPage() {
       </fieldset>
 
       <fieldset className="fieldset">
-        <legend>Strategy</legend>
-        {B("AI model enabled", "strategy.ai_model_enabled")}
-        {B("Pattern recognition enabled", "strategy.pattern_recognition_enabled")}
-        {B("Trend filter enabled", "strategy.trend_filter_enabled")}
+        <legend>Strategie</legend>
+        {B("KI-Modell aktiv", "strategy.ai_model_enabled")}
+        {B("Mustererkennung aktiv", "strategy.pattern_recognition_enabled")}
+        {B("Trendfilter aktiv", "strategy.trend_filter_enabled")}
         <div className="grid">
-          {N("Signal confidence threshold", "strategy.signal_confidence_threshold")}
-          {N("RSI length", "strategy.indicators.rsi_length", "1")}
-          {N("MACD fast", "strategy.indicators.macd_fast", "1")}
-          {N("MACD slow", "strategy.indicators.macd_slow", "1")}
-          {N("MACD signal", "strategy.indicators.macd_signal", "1")}
-          {N("EMA fast", "strategy.indicators.ema_fast", "1")}
-          {N("EMA slow", "strategy.indicators.ema_slow", "1")}
-          {N("ATR length", "strategy.indicators.atr_length", "1")}
+          {N("Signal-Konfidenzschwelle", "strategy.signal_confidence_threshold")}
+          {N("RSI-Länge", "strategy.indicators.rsi_length", "1")}
+          {N("MACD schnell", "strategy.indicators.macd_fast", "1")}
+          {N("MACD langsam", "strategy.indicators.macd_slow", "1")}
+          {N("MACD Signal", "strategy.indicators.macd_signal", "1")}
+          {N("EMA schnell", "strategy.indicators.ema_fast", "1")}
+          {N("EMA langsam", "strategy.indicators.ema_slow", "1")}
+          {N("ATR-Länge", "strategy.indicators.atr_length", "1")}
         </div>
       </fieldset>
 
       <fieldset className="fieldset">
-        <legend>Automation</legend>
-        {B("Manual confirmation (semi-auto)", "automation.manual_confirmation")}
+        <legend>Automatisierung</legend>
+        {B("Manuelle Bestätigung (Halb-Automatik)", "automation.manual_confirmation")}
         <div className="grid">
-          {N("Max trades / hour", "automation.max_trades_per_hour", "1")}
-          {N("Max trades / day", "automation.max_trades_per_day", "1")}
-          {N("Cooldown between trades (s)", "automation.cooldown_seconds", "1")}
+          {N("Max. Trades / Stunde", "automation.max_trades_per_hour", "1")}
+          {N("Max. Trades / Tag", "automation.max_trades_per_day", "1")}
+          {N("Abkühlzeit zwischen Trades (s)", "automation.cooldown_seconds", "1")}
         </div>
       </fieldset>
 
       <fieldset className="fieldset">
-        <legend>Risk management</legend>
+        <legend>Risikomanagement</legend>
         <div className="grid">
           <div>
-            <label>Stop-loss type</label>
+            <label>Stop-Loss-Typ</label>
             <select value={cfg.risk.stop_loss_type} onChange={(e) => upd("risk.stop_loss_type", e.target.value)}>
-              <option value="atr">ATR multiple</option>
-              <option value="percent">Percent</option>
+              <option value="atr">ATR-Vielfaches</option>
+              <option value="percent">Prozent</option>
             </select>
           </div>
-          {N("Stop-loss value", "risk.stop_loss_value")}
-          {N("Take-profit (R:R)", "risk.take_profit_rr")}
-          {N("Daily loss limit (%)", "risk.daily_loss_limit_pct")}
-          {N("Max drawdown (%)", "risk.max_drawdown_pct")}
+          {N("Stop-Loss-Wert", "risk.stop_loss_value")}
+          {N("Take-Profit (Chance:Risiko)", "risk.take_profit_rr")}
+          {N("Tagesverlust-Limit (%)", "risk.daily_loss_limit_pct")}
+          {N("Max. Drawdown (%)", "risk.max_drawdown_pct")}
         </div>
-        {B("Trailing stop enabled", "risk.trailing_stop_enabled")}
+        {B("Trailing-Stop aktiv", "risk.trailing_stop_enabled")}
       </fieldset>
 
       <fieldset className="fieldset">
         <legend>Compliance</legend>
-        {B("Compliance mode (enforces conservative ceilings)", "compliance.compliance_mode")}
-        {B("Halt on high volatility", "compliance.halt_on_high_volatility")}
+        {B("Compliance-Modus (erzwingt konservative Obergrenzen)", "compliance.compliance_mode")}
+        {B("Bei hoher Volatilität pausieren", "compliance.halt_on_high_volatility")}
         <div className="grid">
-          {N("Max API requests / minute", "compliance.max_api_requests_per_minute", "1")}
-          {N("Min seconds between trades", "compliance.min_seconds_between_trades", "1")}
-          {N("High-volatility ATR ratio", "compliance.high_volatility_atr_ratio")}
+          {N("Max. API-Anfragen / Minute", "compliance.max_api_requests_per_minute", "1")}
+          {N("Min. Sekunden zwischen Trades", "compliance.min_seconds_between_trades", "1")}
+          {N("Volatilitäts-Schwelle (ATR/Preis)", "compliance.high_volatility_atr_ratio")}
           <div>
-            <label>Logging level</label>
+            <label>Protokoll-Stufe</label>
             <select value={cfg.compliance.logging_level} onChange={(e) => upd("compliance.logging_level", e.target.value)}>
-              <option value="full_audit">Full audit</option>
-              <option value="basic">Basic</option>
+              <option value="full_audit">Vollständiges Audit</option>
+              <option value="basic">Basis</option>
             </select>
           </div>
         </div>
       </fieldset>
 
-      <button onClick={save}>Save configuration</button>
+      <button onClick={save}>Konfiguration speichern</button>
     </div>
   );
 }

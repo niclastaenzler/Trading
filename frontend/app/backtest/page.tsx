@@ -38,29 +38,29 @@ export default function BacktestPage() {
             <input value={symbol} onChange={(e) => setSymbol(e.target.value)} />
           </div>
           <div style={{ flex: 1 }}>
-            <label>Bars</label>
+            <label>Kerzen (Bars)</label>
             <input type="number" value={bars} onChange={(e) => setBars(parseInt(e.target.value))} />
           </div>
         </div>
         <button style={{ marginTop: 16 }} onClick={run} disabled={busy}>
-          {busy ? "Running…" : "Run backtest"}
+          {busy ? "Läuft…" : "Backtest starten"}
         </button>
       </div>
 
       {result && (
         <>
           <div className="grid" style={{ marginTop: 16 }}>
-            <div className="card"><h3>Return</h3><div className={`metric ${result.total_return_pct >= 0 ? "pos" : "neg"}`}>{result.total_return_pct}%</div></div>
+            <div className="card"><h3>Rendite</h3><div className={`metric ${result.total_return_pct >= 0 ? "pos" : "neg"}`}>{result.total_return_pct}%</div></div>
             <div className="card"><h3>Trades</h3><div className="metric">{result.num_trades}</div></div>
-            <div className="card"><h3>Win rate</h3><div className="metric">{(result.win_rate * 100).toFixed(1)}%</div></div>
-            <div className="card"><h3>Max drawdown</h3><div className="metric neg">{result.max_drawdown_pct}%</div></div>
+            <div className="card"><h3>Trefferquote</h3><div className="metric">{(result.win_rate * 100).toFixed(1)}%</div></div>
+            <div className="card"><h3>Max. Drawdown</h3><div className="metric neg">{result.max_drawdown_pct}%</div></div>
             <div className="card"><h3>Sharpe</h3><div className="metric">{result.sharpe}</div></div>
             <div className="card"><h3>Sortino</h3><div className="metric">{result.sortino}</div></div>
-            <div className="card"><h3>Profit factor</h3><div className="metric">{result.profit_factor}</div></div>
-            <div className="card"><h3>Avg win / loss</h3><div className="metric"><span className="pos">{result.avg_win}</span> / <span className="neg">{result.avg_loss}</span></div></div>
+            <div className="card"><h3>Profit-Faktor</h3><div className="metric">{result.profit_factor}</div></div>
+            <div className="card"><h3>Ø Gewinn / Verlust</h3><div className="metric"><span className="pos">{result.avg_win}</span> / <span className="neg">{result.avg_loss}</span></div></div>
           </div>
           <div className="card" style={{ marginTop: 16 }}>
-            <h3>Equity curve</h3>
+            <h3>Equity-Kurve</h3>
             <EquityChart data={result.equity_curve} />
           </div>
         </>

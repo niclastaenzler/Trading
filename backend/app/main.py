@@ -9,7 +9,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, backtest, config, trades, trading, webhooks, ws
+from app.api.routes import (
+    auth,
+    backtest,
+    config,
+    market,
+    trades,
+    trading,
+    webhooks,
+    ws,
+)
 from app.config import settings
 from app.core.database import init_models
 from app.core.logging_config import configure_logging, get_logger
@@ -75,7 +84,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, config, trading, trades, backtest, webhooks):
+for module in (auth, config, trading, trades, backtest, market, webhooks):
     app.include_router(module.router)
 app.include_router(ws.router)
 

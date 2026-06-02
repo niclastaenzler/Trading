@@ -28,15 +28,15 @@ export default function LoginPage() {
 
   return (
     <div className="auth">
-      <h2>{isRegister ? "Create account" : "Sign in"}</h2>
+      <h2>{isRegister ? "Konto erstellen" : "Anmelden"}</h2>
       <p style={{ color: "var(--muted)", fontSize: 13 }}>
-        The first account created becomes the single <b>owner</b>.
+        Das erste erstellte Konto wird zum alleinigen <b>Owner</b>.
       </p>
       {error && <div className="banner">{error}</div>}
       <form onSubmit={submit}>
-        <label>Email</label>
+        <label>E-Mail</label>
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
-        <label>Password</label>
+        <label>Passwort</label>
         <input
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -45,22 +45,22 @@ export default function LoginPage() {
         />
         {isRegister && (
           <>
-            <label>Invite code</label>
+            <label>Einladungscode</label>
             <input
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
               type="text"
-              placeholder="required if the instance is protected"
+              placeholder="nur nötig, wenn die Instanz geschützt ist"
             />
           </>
         )}
         <button style={{ marginTop: 16, width: "100%" }} type="submit">
-          {isRegister ? "Register" : "Login"}
+          {isRegister ? "Registrieren" : "Anmelden"}
         </button>
       </form>
       <p style={{ marginTop: 12 }}>
         <a onClick={() => setIsRegister(!isRegister)} style={{ cursor: "pointer" }}>
-          {isRegister ? "Have an account? Sign in" : "Need an account? Register"}
+          {isRegister ? "Schon ein Konto? Anmelden" : "Noch kein Konto? Registrieren"}
         </a>
       </p>
     </div>

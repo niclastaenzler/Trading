@@ -18,10 +18,10 @@ export default function Nav() {
 
   const links = [
     { href: "/", label: "Dashboard" },
-    { href: "/config", label: "Configuration" },
+    { href: "/config", label: "Konfiguration" },
     { href: "/trades", label: "Trades" },
     { href: "/backtest", label: "Backtest" },
-    { href: "/settings", label: "Settings" },
+    { href: "/settings", label: "Einstellungen" },
   ];
 
   return (
@@ -48,7 +48,7 @@ export default function Nav() {
             router.push("/login");
           }}
         >
-          Logout
+          Abmelden
         </button>
       )}
     </nav>

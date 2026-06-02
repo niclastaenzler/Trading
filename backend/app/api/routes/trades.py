@@ -57,10 +57,21 @@ async def performance(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    broker = get_broker(user.id, "paper")  # account view; live read is opt-in
-    await broker.connect()
-    equity = await broker.get_balance()
-    positions = await broker.get_positions()
+    # Read equity/positions from the user's ACTUAL broker (Capital.com etc.),
+    # falling back to paper if the live broker is unreachable.
+    broker = _build_user_broker(user)
+    try:
+        await broker.connect()
+        equity = await broker.get_balance()
+        positions = await broker.get_positions()
+    except Exception:
+        paper = get_broker(user.id, "paper")
+        await paper.connect()
+        equity = await paper.get_balance()
+        positions = await paper.get_positions()
+    finally:
+        if hasattr(broker, "aclose"):
+            await broker.aclose()
 
     # Pull all closed-trade PnLs (chronological) and derive metrics in Python.
     rows = (
@@ -189,6 +200,30 @@ async def open_positions(user: User = Depends(get_current_user)):
         ]
     except Exception:
         return []
+    finally:
+        if hasattr(broker, "aclose"):
+            await broker.aclose()
+
+
+@router.get("/account")
+async def account_info(user: User = Depends(get_current_user)):
+    """Account summary from the active broker: balance, open positions, mode."""
+    broker = _build_user_broker(user)
+    try:
+        await broker.connect()
+        balance = await broker.get_balance()
+        positions = await broker.get_positions()
+        return {
+            "broker": broker.name,
+            "mode": "demo/paper" if broker.is_paper else "LIVE",
+            "is_paper": broker.is_paper,
+            "balance": round(float(balance), 2),
+            "open_positions": len(positions),
+            "unrealized_pnl": round(sum(p.unrealized_pnl for p in positions), 2),
+            "ok": True,
+        }
+    except Exception as exc:
+        return {"broker": broker.name, "ok": False, "error": str(exc)[:200]}
     finally:
         if hasattr(broker, "aclose"):
             await broker.aclose()

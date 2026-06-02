@@ -19,18 +19,18 @@ export default function TradesPage() {
 
   return (
     <div>
-      <h2>Trade history</h2>
+      <h2>Handelshistorie</h2>
       <div className="card">
         <table>
           <thead>
             <tr>
-              <th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Exit</th>
-              <th>PnL</th><th>Conf</th><th>Mode</th><th>Status</th><th>Opened</th>
+              <th>Symbol</th><th>Seite</th><th>Menge</th><th>Einstieg</th><th>Ausstieg</th>
+              <th>PnL</th><th>Konf.</th><th>Modus</th><th>Status</th><th>Eröffnet</th>
             </tr>
           </thead>
           <tbody>
             {trades.length === 0 && (
-              <tr><td colSpan={10} style={{ color: "var(--muted)" }}>No trades yet.</td></tr>
+              <tr><td colSpan={10} style={{ color: "var(--muted)" }}>Noch keine Trades.</td></tr>
             )}
             {trades.map((t) => (
               <tr key={t.id}>
@@ -42,7 +42,7 @@ export default function TradesPage() {
                 <td className={t.pnl >= 0 ? "pos" : "neg"}>{t.pnl?.toFixed?.(2) ?? "—"}</td>
                 <td>{t.confidence ? (t.confidence * 100).toFixed(0) + "%" : "—"}</td>
                 <td>{t.mode}</td>
-                <td><span className={`pill ${t.status === "OPEN" ? "on" : "off"}`}>{t.status}</span></td>
+                <td><span className={`pill ${t.status === "OPEN" ? "on" : "off"}`}>{t.status === "OPEN" ? "OFFEN" : "GESCHLOSSEN"}</span></td>
                 <td>{new Date(t.opened_at).toLocaleString()}</td>
               </tr>
             ))}

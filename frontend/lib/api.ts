@@ -87,6 +87,11 @@ export const api = {
   setBroker: (creds: any) =>
     request<any>("/api/trades/broker", { method: "POST", body: JSON.stringify(creds) }),
   testBroker: () => request<any>("/api/trades/broker/test", { method: "POST" }),
+  account: () => request<any>("/api/trades/account"),
+  candles: (symbol: string, timeframe: string, bars = 200) =>
+    request<any>(
+      `/api/market/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&bars=${bars}`
+    ),
 };
 
 export function wsUrl(): string {
