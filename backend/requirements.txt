@@ -16,6 +16,8 @@ alembic==1.13.2
 
 # --- Cache / realtime bus ---
 redis==5.0.7
+# In-memory Redis fallback (used when REDIS_URL is unset; also used in tests).
+fakeredis==2.23.3
 
 # --- Security ---
 # Pin bcrypt < 4.1: passlib 1.7.4 reads bcrypt.__about__ which 4.1 removed.
@@ -43,4 +45,3 @@ httpx==0.27.0
 pytest==8.2.2
 pytest-asyncio==0.23.7
 aiosqlite==0.20.0
-fakeredis==2.23.3

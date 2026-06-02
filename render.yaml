@@ -2,14 +2,19 @@
 # Deploy: Render Dashboard -> New -> Blueprint -> pick this repo.
 # Docs: https://render.com/docs/blueprint-spec
 #
-# Database = Supabase (already provisioned); Redis = Upstash (free).
-# Set the `sync: false` secrets in the Render dashboard after the first deploy.
+# "Render-only" setup: NO external services required. Uses an ephemeral SQLite
+# file and an in-process Redis fallback so the app runs with zero extra signups.
+# The ONLY thing you set by hand is ENCRYPTION_KEY (one Fernet key).
+#
+# Trade-off: data (accounts, trades) is ephemeral — it resets on every restart /
+# redeploy. To persist data later, switch DATABASE_URL to Supabase and REDIS_URL
+# to Upstash (see DEPLOYMENT.md).
 
 services:
   - type: web
     name: ai-trading-backend
     runtime: docker
-    repo: https://github.com/niclastaenzler/trading
+    repo: https://github.com/niclastaenzler/Trading
     branch: claude/ai-trading-platform-mvp-T280y
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
@@ -28,12 +33,16 @@ services:
         generateValue: true
       - key: TRADINGVIEW_WEBHOOK_SECRET
         generateValue: true
-      # --- set these manually in the dashboard (sync:false) ---
-      - key: ENCRYPTION_KEY        # Fernet key: python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())"
-        sync: false
-      - key: DATABASE_URL          # Supabase: postgresql+asyncpg://postgres:[PW]@db.cddgxnbyhkrhehilitzz.supabase.co:5432/postgres
-        sync: false
-      - key: REDIS_URL             # Upstash: rediss://default:[PW]@[host]:6379
-        sync: false
-      - key: CORS_ORIGINS          # e.g. https://niclastaenzler.github.io
+      # Ephemeral SQLite file (no external DB needed).
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:////tmp/app.db
+      # In-process Redis fallback (no external Redis needed).
+      - key: REDIS_URL
+        value: memory
+      # Frontend origin allowed by CORS (GitHub Pages, origin only — no path).
+      - key: CORS_ORIGINS
+        value: https://niclastaenzler.github.io
+      # --- the ONLY secret to set by hand in the Render dashboard ---
+      # Fernet key: python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())"
+      - key: ENCRYPTION_KEY
         sync: false

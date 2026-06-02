@@ -12,19 +12,32 @@ from typing import Any
 import redis.asyncio as aioredis
 
 from app.config import settings
+from app.core.logging_config import get_logger
+
+logger = get_logger("redis")
 
 _redis: aioredis.Redis | None = None
 
 SIGNAL_CHANNEL = "signals"
 EVENTS_CHANNEL = "events"
 
+# Values of REDIS_URL that select the in-process fake (no external Redis needed).
+_IN_MEMORY = {"", "memory", "inmemory", "fakeredis", "fake"}
+
 
 def get_redis() -> aioredis.Redis:
     global _redis
     if _redis is None:
-        _redis = aioredis.from_url(
-            settings.redis_url, encoding="utf-8", decode_responses=True
-        )
+        url = (settings.redis_url or "").strip()
+        if url.lower() in _IN_MEMORY:
+            # Single-process in-memory Redis — lets the app run on one host with
+            # no external Redis. State is per-process and resets on restart.
+            import fakeredis.aioredis
+
+            _redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+            logger.warning("REDIS_URL not set -> using in-memory Redis (ephemeral)")
+        else:
+            _redis = aioredis.from_url(url, encoding="utf-8", decode_responses=True)
     return _redis
 
 
