@@ -6,10 +6,8 @@ and `app.services.config_defaults`.
 """
 
 from functools import lru_cache
-from typing import Annotated
 
-from pydantic import field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -46,17 +44,14 @@ class Settings(BaseSettings):
     telegram_chat_id: str = ""
 
     # --- CORS ---
-    # Accept a comma-separated string from the env (e.g.
-    # "https://user.github.io,http://localhost:3000"). NoDecode stops
-    # pydantic-settings from trying to JSON-decode it first.
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
+    # Comma-separated origins, e.g. "https://user.github.io,http://localhost:3000".
+    # Kept as a plain string (not list) so it works on any pydantic-settings
+    # version without JSON-decoding the env value; split via `cors_origins_list`.
+    cors_origins: str = "http://localhost:3000"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _split_cors(cls, v):
-        if isinstance(v, str):
-            return [o.strip() for o in v.split(",") if o.strip()]
-        return v
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def is_production(self) -> bool:
