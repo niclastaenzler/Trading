@@ -129,6 +129,71 @@ class AIModel:
         return {"folds": len(scores), "fold_scores": [round(s, 3) for s in scores],
                 "mean_oos_score": round(mean, 3) if mean is not None else None}
 
+    def train_pooled(self, enriched_frames: list[pd.DataFrame], test_fraction: float = 0.2) -> dict:
+        """Train ONE model on features pooled across many instruments (a basic
+        cross-sectional / multi-asset model). Each frame is an indicator-enriched
+        OHLCV DataFrame. Returns metrics + feature importance."""
+        if not _SKLEARN:
+            raise RuntimeError("scikit-learn not installed; cannot train.")
+        xs, ys = [], []
+        for df in enriched_frames:
+            if df is None or len(df) < 60:
+                continue
+            X, y = self._labelled(df)
+            if len(X):
+                xs.append(X)
+                ys.append(y)
+        if not xs:
+            raise RuntimeError("no usable training data")
+        X = pd.concat(xs, ignore_index=True)
+        y = pd.concat(ys, ignore_index=True)
+        split = int(len(X) * (1 - test_fraction))
+        model = self._new_estimator()
+        model.fit(X.iloc[:split], y.iloc[:split])
+        os.makedirs(os.path.dirname(MODEL_PATH) or ".", exist_ok=True)
+        joblib.dump(model, MODEL_PATH)
+        self._model = model
+        test_score = (
+            float(model.score(X.iloc[split:], y.iloc[split:])) if split < len(X) else None
+        )
+        return {
+            "instruments": len(xs),
+            "trained_on": int(split),
+            "tested_on": int(len(X) - split),
+            "train_score": round(float(model.score(X.iloc[:split], y.iloc[:split])), 4),
+            "test_score": round(test_score, 4) if test_score is not None else None,
+            "feature_importance": self.feature_importance(),
+        }
+
+    def feature_importance(self) -> list[dict]:
+        imp = getattr(self._model, "feature_importances_", None)
+        if imp is None:
+            return []
+        pairs = sorted(zip(FEATURES, imp), key=lambda kv: kv[1], reverse=True)
+        return [{"feature": f, "importance": round(float(v), 4)} for f, v in pairs]
+
+    def dumps(self) -> bytes | None:
+        """Serialise the fitted model to bytes (for DB persistence)."""
+        if self._model is None:
+            return None
+        import io
+        buf = io.BytesIO()
+        joblib.dump(self._model, buf)
+        return buf.getvalue()
+
+    def loads(self, data: bytes) -> bool:
+        """Load a model from bytes (e.g. from the DB at startup)."""
+        try:
+            import io
+            self._model = joblib.load(io.BytesIO(data))
+            return True
+        except Exception:
+            return False
+
+    @property
+    def is_trained(self) -> bool:
+        return self._model is not None
+
     # --- inference ---
     def predict(self, df: pd.DataFrame) -> Prediction:
         feat = build_features(df).iloc[[-1]][FEATURES]

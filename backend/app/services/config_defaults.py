@@ -80,6 +80,9 @@ class StrategySettings(BaseModel):
     ai_model_enabled: bool = True
     pattern_recognition_enabled: bool = True
     trend_filter_enabled: bool = True
+    # News/sentiment overlay. Inactive until a news source is connected
+    # (no feed = neutral, no effect). See app.services.sentiment.
+    use_sentiment: bool = False
     indicators: IndicatorParams = Field(default_factory=IndicatorParams)
     # Minimum combined confidence (0-1) required before any trade.
     signal_confidence_threshold: float = Field(0.65, ge=0.5, le=0.99)

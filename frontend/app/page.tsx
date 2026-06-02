@@ -47,6 +47,22 @@ export default function Dashboard() {
     setEdgeBusy(false);
   }
 
+  // KI-Modell-Training (gepooltes Multi-Asset-Modell) + Status.
+  const [model, setModel] = useState<any>(null);
+  const [training, setTraining] = useState(false);
+  async function loadModel() { try { setModel(await api.modelStatus()); } catch { setModel(null); } }
+  async function trainModel() {
+    setTraining(true);
+    try {
+      const r = await api.trainModel();
+      if (r.ok === false) setModel({ ...(model || {}), error: r.error });
+      else await loadModel();
+    } catch (e: any) {
+      setModel({ ...(model || {}), error: e.message });
+    }
+    setTraining(false);
+  }
+
   const refreshRef = useRef<() => void>(() => {});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -74,6 +90,7 @@ export default function Dashboard() {
     if (!getToken()) { router.push("/login"); return; }
     refresh();
     loadScan();
+    loadModel();
     const ws = new WebSocket(wsUrl());
     ws.onopen = () => setLive(true);
     ws.onclose = () => setLive(false);
@@ -251,7 +268,7 @@ export default function Dashboard() {
         ) : (
           <table>
             <thead>
-              <tr><th>#</th><th>Symbol</th><th>Signal</th><th>Konfidenz</th><th>Edge-Score</th><th>Regime</th><th>Status</th></tr>
+              <tr><th>#</th><th>Symbol</th><th>Signal</th><th>Konfidenz</th><th>Edge-Score</th><th>Rel. Stärke</th><th>Regime</th><th>Status</th></tr>
             </thead>
             <tbody>
               {scan.slice(0, 25).map((o, i) => (
@@ -263,6 +280,7 @@ export default function Dashboard() {
                   </td>
                   <td>{(o.confidence * 100).toFixed(0)}%</td>
                   <td><b>{((o.edge_score ?? 0) * 100).toFixed(0)}</b></td>
+                  <td>{o.rel_strength != null ? (o.rel_strength * 100).toFixed(0) + "%" : "—"}</td>
                   <td>{o.regime === "trend" ? "📈 Trend" : o.regime === "range" ? "↔ Seitwärts" : "—"}</td>
                   <td>
                     {o.actionable
@@ -273,6 +291,43 @@ export default function Dashboard() {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* KI-Modell-Training */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h3 className="row" style={{ justifyContent: "space-between" }}>
+          <span>🧠 KI-Modell (gepooltes Multi-Asset-Training)</span>
+          <button className="secondary" onClick={trainModel} disabled={training}>
+            {training ? "Trainiere…" : "Modell trainieren"}
+          </button>
+        </h3>
+        <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 0 }}>
+          Trainiert ein gemeinsames Modell über alle konfigurierten Märkte (echte
+          Broker-Historie, wenn verbunden). Wird in der Datenbank gespeichert und
+          übersteht Neustarts.
+        </p>
+        {model?.error && <div className="banner">{model.error}</div>}
+        {model ? (
+          <div className="row" style={{ gap: 24 }}>
+            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>STATUS</div>
+              <span className={`pill ${model.is_trained ? "on" : "off"}`}>{model.is_trained ? "trainiert" : "Heuristik"}</span></div>
+            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>ZULETZT</div><b>{model.trained_at ? new Date(model.trained_at).toLocaleString() : "—"}</b></div>
+            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>OUT-OF-SAMPLE</div><b>{model.metrics?.test_score != null ? (model.metrics.test_score * 100).toFixed(1) + "%" : "—"}</b></div>
+            <div><div style={{ color: "var(--muted)", fontSize: 12 }}>INSTRUMENTE</div><b>{model.metrics?.instruments ?? "—"}</b></div>
+          </div>
+        ) : <p style={{ color: "var(--muted)", fontSize: 13 }}>Lade…</p>}
+        {model?.feature_importance?.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>WICHTIGSTE FEATURES</div>
+            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+              {model.feature_importance.slice(0, 7).map((f: any) => (
+                <span key={f.feature} className="pill" style={{ background: "var(--panel-2)", color: "var(--text)" }}>
+                  {f.feature}: {(f.importance * 100).toFixed(0)}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

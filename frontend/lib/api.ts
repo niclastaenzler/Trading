@@ -96,6 +96,8 @@ export const api = {
   universe: () => request<any>("/api/market/universe"),
   edgeEval: (symbol: string, timeframe = "1d") =>
     request<any>(`/api/research/edge?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&bars=1000`),
+  modelStatus: () => request<any>("/api/research/model"),
+  trainModel: () => request<any>("/api/research/train", { method: "POST" }),
 };
 
 export function wsUrl(): string {

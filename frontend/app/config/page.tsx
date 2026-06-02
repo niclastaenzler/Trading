@@ -107,16 +107,30 @@ export default function ConfigPage() {
     setMsg(`Profil „${name}" übernommen — jetzt unten „Speichern" klicken.`);
   }
 
-  const N = (label: string, path: string, step = "any") => {
+  // Small info "ⓘ" with a hover tooltip explaining the field.
+  const Info = ({ text }: { text: string }) =>
+    text ? (
+      <span
+        title={text}
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 15, height: 15, borderRadius: "50%", fontSize: 10, marginLeft: 6,
+          background: "var(--panel-2)", color: "var(--accent)", cursor: "help",
+          border: "1px solid var(--border)",
+        }}
+      >ⓘ</span>
+    ) : null;
+
+  const N = (label: string, path: string, step = "any", info = "") => {
     const val = path.split(".").reduce((o, k) => o[k], cfg);
     return (
       <div>
-        <label>{label}</label>
+        <label>{label}<Info text={info} /></label>
         <input type="number" step={step} value={val} onChange={(e) => num(path, e.target.value)} />
       </div>
     );
   };
-  const B = (label: string, path: string) => {
+  const B = (label: string, path: string, info = "") => {
     const val = path.split(".").reduce((o, k) => o[k], cfg);
     return (
       <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>
@@ -126,7 +140,7 @@ export default function ConfigPage() {
           checked={!!val}
           onChange={(e) => upd(path, e.target.checked)}
         />
-        {label}
+        {label}<Info text={info} />
       </label>
     );
   };
@@ -174,8 +188,10 @@ export default function ConfigPage() {
       <fieldset className="fieldset">
         <legend>Trading</legend>
         <div className="grid">
-          {N("Risiko pro Trade (%)", "trading.risk_per_trade_pct")}
-          {N("Max. offene Positionen", "trading.max_open_positions", "1")}
+          {N("Risiko pro Trade (%)", "trading.risk_per_trade_pct", "any",
+            "Wie viel % deines Kontos pro Trade riskiert wird (Verlust bis zum Stop-Loss). Konservativ: 0,5–1 %.")}
+          {N("Max. offene Positionen", "trading.max_open_positions", "1",
+            "Wie viele Positionen gleichzeitig offen sein dürfen. Begrenzt das Gesamtrisiko.")}
           <div>
             <label>Erlaubte Symbole (durch Komma getrennt)</label>
             <input
@@ -204,11 +220,17 @@ export default function ConfigPage() {
 
       <fieldset className="fieldset">
         <legend>Strategie</legend>
-        {B("KI-Modell aktiv", "strategy.ai_model_enabled")}
-        {B("Mustererkennung aktiv", "strategy.pattern_recognition_enabled")}
-        {B("Trendfilter aktiv", "strategy.trend_filter_enabled")}
+        {B("KI-Modell aktiv", "strategy.ai_model_enabled",
+          "Nutzt das trainierte ML-Modell (sonst nur Indikatoren/Muster).")}
+        {B("Mustererkennung aktiv", "strategy.pattern_recognition_enabled",
+          "Erkennt Candlestick-Muster & Ausbrüche als zusätzliches Signal.")}
+        {B("Trendfilter aktiv", "strategy.trend_filter_enabled",
+          "Handelt nur in Trendrichtung (kein Gegen-den-Trend-Handel).")}
+        {B("News-/Sentiment-Overlay (Platzhalter)", "strategy.use_sentiment",
+          "Vorbereitet, aber inaktiv bis eine echte News-Datenquelle angebunden ist — wirkt aktuell neutral.")}
         <div className="grid">
-          {N("Signal-Konfidenzschwelle", "strategy.signal_confidence_threshold")}
+          {N("Signal-Konfidenzschwelle", "strategy.signal_confidence_threshold", "any",
+            "Mindest-Konfidenz (0,5–0,99), bevor überhaupt gehandelt wird. Höher = weniger, aber sicherere Trades.")}
           {N("RSI-Länge", "strategy.indicators.rsi_length", "1")}
           {N("MACD schnell", "strategy.indicators.macd_fast", "1")}
           {N("MACD langsam", "strategy.indicators.macd_slow", "1")}
@@ -239,13 +261,19 @@ export default function ConfigPage() {
               <option value="percent">Prozent</option>
             </select>
           </div>
-          {N("Stop-Loss-Wert", "risk.stop_loss_value")}
-          {N("Take-Profit (Chance:Risiko)", "risk.take_profit_rr")}
-          {N("Tagesverlust-Limit (%)", "risk.daily_loss_limit_pct")}
-          {N("Max. Drawdown (%)", "risk.max_drawdown_pct")}
+          {N("Stop-Loss-Wert", "risk.stop_loss_value", "any",
+            "Abstand des Stops: bei ATR = Vielfaches der Schwankung, bei Prozent = % vom Preis.")}
+          {N("Take-Profit (Chance:Risiko)", "risk.take_profit_rr", "any",
+            "Gewinnziel relativ zum Risiko. 2,0 = Ziel ist doppelt so weit wie der Stop.")}
+          {N("Tagesverlust-Limit (%)", "risk.daily_loss_limit_pct", "any",
+            "Maximaler Verlust pro Tag in % — danach stoppt der Handel automatisch.")}
+          {N("Max. Drawdown (%)", "risk.max_drawdown_pct", "any",
+            "Maximaler Rückgang vom Höchststand, bevor der Handel pausiert.")}
         </div>
-        {B("Trailing-Stop aktiv", "risk.trailing_stop_enabled")}
-        {B("Positionsgröße nach KI-Konfidenz skalieren", "risk.confidence_scaled_sizing")}
+        {B("Trailing-Stop aktiv", "risk.trailing_stop_enabled",
+          "Zieht den Stop bei Gewinn nach.")}
+        {B("Positionsgröße nach KI-Konfidenz skalieren", "risk.confidence_scaled_sizing",
+          "Stärkere Signale bekommen größere Positionen (innerhalb des Risiko-Budgets).")}
       </fieldset>
 
       <fieldset className="fieldset">
@@ -253,12 +281,17 @@ export default function ConfigPage() {
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
           Nur die wirklich attraktiven Setups handeln — Ziel ist besseres, nicht mehr Trading.
         </p>
-        {B("Edge-Layer aktiv", "edge.enabled")}
-        {B("Nur im Trend handeln (Seitwärtsphasen meiden)", "edge.require_trend_regime")}
+        {B("Edge-Layer aktiv", "edge.enabled",
+          "Filtert schwache Setups heraus — handelt nur, wenn der Kontext stimmt.")}
+        {B("Nur im Trend handeln (Seitwärtsphasen meiden)", "edge.require_trend_regime",
+          "Überspringt choppy/seitwärts laufende Märkte (oft Verlustquelle).")}
         <div className="grid">
-          {N("Mindest-Edge-Score (0–1)", "edge.min_edge_score")}
-          {N("Mindest-Trendstärke (0–1)", "edge.min_trend_strength")}
-          {N("Max. Volatilitäts-Perzentil (0–1)", "edge.max_volatility_percentile")}
+          {N("Mindest-Edge-Score (0–1)", "edge.min_edge_score", "any",
+            "Gesamtnote aus Konfidenz + Kontext. Höher = selektiver. Empf.: 0,5.")}
+          {N("Mindest-Trendstärke (0–1)", "edge.min_trend_strength", "any",
+            "Wie klar der Trend sein muss (Efficiency Ratio). 0,3 = moderater Trend.")}
+          {N("Max. Volatilitäts-Perzentil (0–1)", "edge.max_volatility_percentile", "any",
+            "Überspringt extrem volatile Phasen. 0,9 = nur die obersten 10 % meiden.")}
         </div>
       </fieldset>
 

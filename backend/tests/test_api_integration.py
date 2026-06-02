@@ -117,6 +117,26 @@ async def test_research_edge_verdict(owner_client):
     assert "recommendations" in data and "feature_importance" in data
 
 
+async def test_model_status_and_training(owner_client):
+    # Initially no trained model status fields still present.
+    res = await owner_client.get("/api/research/model")
+    assert res.status_code == 200
+    assert "is_trained" in res.json()
+
+    # Train a small pooled model on synthetic data (paper broker).
+    tr = await owner_client.post("/api/research/train?bars=300&max_symbols=3")
+    assert tr.status_code == 200
+    data = tr.json()
+    assert data.get("ok") is True
+    assert data["instruments"] >= 1
+    assert len(data["feature_importance"]) > 0
+
+    # Status now reports a trained model with persisted feature importance.
+    st = await owner_client.get("/api/research/model")
+    assert st.json()["is_trained"] is True
+    assert len(st.json()["feature_importance"]) > 0
+
+
 async def test_config_exposes_edge_settings(owner_client):
     res = await owner_client.get("/api/config")
     cfg = res.json()["config"]

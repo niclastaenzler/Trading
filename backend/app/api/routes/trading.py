@@ -81,6 +81,23 @@ async def scan_market(
         if hasattr(broker, "aclose"):
             await broker.aclose()
 
+    # Cross-sectional relative strength: rank each symbol's 20-bar momentum
+    # against the rest of the scanned universe (0..1 percentile).
+    moms = {}
+    for s, df, _sig in ranked:
+        try:
+            moms[s] = float(df["close"].iloc[-1] / df["close"].iloc[-21] - 1)
+        except Exception:
+            moms[s] = 0.0
+    ordered = sorted(moms.values())
+    n = len(ordered)
+
+    def rel_strength(sym: str) -> float:
+        if n <= 1:
+            return 0.5
+        rank = sum(1 for v in ordered if v <= moms[sym])
+        return round(rank / n, 3)
+
     def reason(sig) -> str:
         c = sig.components or {}
         if sig.actionable:
@@ -101,6 +118,7 @@ async def scan_market(
                 "direction": sig.direction,
                 "confidence": round(sig.confidence, 4),
                 "edge_score": round(sig.edge_score, 4),
+                "rel_strength": rel_strength(s),
                 "regime": (sig.components.get("regime") or {}).get("regime", "—"),
                 "price": round(sig.price, 6),
                 "actionable": sig.actionable,

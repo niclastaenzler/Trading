@@ -52,6 +52,15 @@ async def lifespan(app: FastAPI):
 
     if os.getenv("SKIP_DB_INIT") != "1":
         await init_models()
+        # Load the most recently trained model so it survives restarts.
+        try:
+            from app.core.database import SessionLocal
+            from app.services.model_store import load_latest_model
+
+            async with SessionLocal() as db:
+                await load_latest_model(db)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("could not load trained model: %s", exc)
     try:
         await get_redis().ping()
     except Exception as exc:  # pragma: no cover
