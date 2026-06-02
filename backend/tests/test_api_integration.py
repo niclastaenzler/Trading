@@ -92,6 +92,22 @@ async def test_run_cycle_executes_pipeline(owner_client):
     assert isinstance(body["results"], list)
 
 
+async def test_market_universe(owner_client):
+    res = await owner_client.get("/api/market/universe")
+    assert res.status_code == 200
+    groups = res.json()["groups"]
+    assert "forex" in groups and "commodities" in groups and "stocks" in groups
+
+
+async def test_market_scan_ranks_opportunities(owner_client):
+    res = await owner_client.get("/api/trading/scan")
+    assert res.status_code == 200
+    opps = res.json()["opportunities"]
+    assert isinstance(opps, list)
+    for o in opps:
+        assert "symbol" in o and "confidence" in o and "actionable" in o
+
+
 async def test_performance_shape(owner_client):
     res = await owner_client.get("/api/trades/performance")
     assert res.status_code == 200

@@ -13,8 +13,16 @@ from app.core.encryption import decrypt
 from app.models.user import User
 from app.services.broker import get_broker
 from app.services.market_data import fetch_ohlcv
+from app.services.universe import UNIVERSE, all_symbols
 
 router = APIRouter(prefix="/api/market", tags=["market"])
+
+
+@router.get("/universe")
+async def market_universe(user: User = Depends(get_current_user)):
+    """Tradable universe grouped by asset class (forex, commodities, indices,
+    stocks) — used by the config UI to build a multi-asset portfolio."""
+    return {"groups": UNIVERSE, "all": all_symbols()}
 
 
 def _user_broker(user: User):

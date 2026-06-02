@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, getToken } from "@/lib/api";
 
+const MARKET_LABELS: Record<string, string> = {
+  forex: "Forex (Währungen)",
+  commodities: "Rohstoffe",
+  indices: "Indizes",
+  stocks: "Aktien",
+};
+
 // Helper to read/write nested config paths immutably.
 function setPath(obj: any, path: string, value: any) {
   const keys = path.split(".");
@@ -17,6 +24,7 @@ function setPath(obj: any, path: string, value: any) {
 export default function ConfigPage() {
   const router = useRouter();
   const [cfg, setCfg] = useState<any>(null);
+  const [universe, setUniverse] = useState<Record<string, string[]>>({});
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
@@ -26,13 +34,27 @@ export default function ConfigPage() {
       return;
     }
     api.getConfig().then((r) => setCfg(r.config));
+    api.universe().then((u) => setUniverse(u.groups || {})).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!cfg) return <p>Loading…</p>;
+  if (!cfg) return <p>Lädt…</p>;
 
   const upd = (path: string, value: any) => setCfg(setPath(cfg, path, value));
   const num = (path: string, v: string) => upd(path, parseFloat(v));
+
+  // Add a market group's symbols to the allowed list (unique, keeps existing).
+  function addMarket(group: string) {
+    const current: string[] = cfg.trading.allowed_symbols || [];
+    const merged = Array.from(new Set([...current, ...(universe[group] || [])]));
+    upd("trading.allowed_symbols", merged);
+    setMsg(`„${MARKET_LABELS[group] || group}" hinzugefügt — unten „Speichern" klicken.`);
+  }
+  function allMarkets() {
+    const merged = Array.from(new Set(Object.values(universe).flat()));
+    upd("trading.allowed_symbols", merged);
+    setMsg(`Alle Märkte (${merged.length} Instrumente) übernommen — „Speichern" klicken.`);
+  }
 
   async function save() {
     setErr(""); setMsg("");
@@ -126,6 +148,27 @@ export default function ConfigPage() {
           <button className="secondary" onClick={() => applyPreset("Ausgewogen")}>⚖️ Ausgewogen</button>
           <button className="secondary" onClick={() => applyPreset("Aggressiv")}>🔥 Aggressiv</button>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h3>Märkte / Portfolio</h3>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
+          Wähle, welche Märkte gehandelt werden. Die KI scannt dann alle Instrumente
+          und entscheidet, was gehandelt wird. Aktuell:{" "}
+          <b>{(cfg.trading.allowed_symbols || []).length}</b> Instrumente.
+        </p>
+        <div className="row">
+          {Object.keys(universe).map((g) => (
+            <button key={g} className="secondary" onClick={() => addMarket(g)}>
+              + {MARKET_LABELS[g] || g} ({universe[g].length})
+            </button>
+          ))}
+          <button onClick={allMarkets}>🌍 Alle Märkte</button>
+          <button className="secondary" onClick={() => upd("trading.allowed_symbols", [])}>Leeren</button>
+        </div>
+        <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 12, wordBreak: "break-word" }}>
+          {(cfg.trading.allowed_symbols || []).join(", ") || "— keine —"}
+        </p>
       </div>
 
       <fieldset className="fieldset">

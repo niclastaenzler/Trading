@@ -29,6 +29,15 @@ export default function Dashboard() {
   const [candles, setCandles] = useState<any[]>([]);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
 
+  // KI-Marktanalyse (portfolio scan).
+  const [scan, setScan] = useState<any[]>([]);
+  const [scanning, setScanning] = useState(false);
+  async function loadScan() {
+    setScanning(true);
+    try { setScan((await api.scan()).opportunities || []); } catch { setScan([]); }
+    setScanning(false);
+  }
+
   const refreshRef = useRef<() => void>(() => {});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,6 +64,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!getToken()) { router.push("/login"); return; }
     refresh();
+    loadScan();
     const ws = new WebSocket(wsUrl());
     ws.onopen = () => setLive(true);
     ws.onclose = () => setLive(false);
@@ -210,6 +220,50 @@ export default function Dashboard() {
         <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 0 }}>
           Aktualisiert automatisch alle 30 s. Datenquelle: dein verbundener Broker (sonst simuliert).
         </p>
+      </div>
+
+      {/* KI-Marktanalyse: was die KI handeln will */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h3 className="row" style={{ justifyContent: "space-between" }}>
+          <span>🤖 KI-Marktanalyse — was gehandelt werden soll</span>
+          <button className="secondary" onClick={loadScan} disabled={scanning}>
+            {scanning ? "Scanne…" : "Markt scannen"}
+          </button>
+        </h3>
+        <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 0 }}>
+          Die KI bewertet alle konfigurierten Instrumente und sortiert nach Konfidenz.
+          Grün = handelbares Signal. Die Engine handelt die stärksten zuerst (begrenzt
+          durch „max. offene Positionen" &amp; Risiko).
+        </p>
+        {scan.length === 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>
+            {scanning ? "Analysiere Markt…" : "Noch keine Analyse — auf »Markt scannen« klicken."}
+          </p>
+        ) : (
+          <table>
+            <thead>
+              <tr><th>#</th><th>Symbol</th><th>Signal</th><th>Konfidenz</th><th>Preis</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {scan.slice(0, 25).map((o, i) => (
+                <tr key={o.symbol} style={o.actionable ? { background: "rgba(46,204,113,.06)" } : {}}>
+                  <td>{i + 1}</td>
+                  <td><b>{o.symbol}</b></td>
+                  <td className={o.direction > 0 ? "pos" : o.direction < 0 ? "neg" : ""}>
+                    {o.action === "BUY" ? "KAUF" : o.action === "SELL" ? "VERKAUF" : "—"}
+                  </td>
+                  <td>{(o.confidence * 100).toFixed(0)}%</td>
+                  <td>{o.price}</td>
+                  <td>
+                    {o.actionable
+                      ? <span className="pill on">handelbar</span>
+                      : <span style={{ color: "var(--muted)", fontSize: 12 }}>{o.reason}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Kennzahlen */}

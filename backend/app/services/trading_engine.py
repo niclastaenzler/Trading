@@ -278,3 +278,19 @@ class TradingEngine:
             if hit:
                 results.append(await self.close_position(pos.symbol, reason=hit))
         return results
+
+    # --- portfolio scan: the AI decides WHAT to trade across the universe ---
+    async def scan(self, symbols: list[str]) -> list[tuple]:
+        """Compute the fused AI/pattern/trend signal for every symbol and rank
+        them best-first (actionable first, then by confidence). Returns a list of
+        (symbol, ohlcv_df, signal) so the cycle can act on the strongest ideas."""
+        out: list[tuple] = []
+        for sym in symbols:
+            try:
+                df = await fetch_ohlcv(sym, bars=200, broker=self.broker)
+                sig = generate_signal(sym, df, self.cfg.strategy)
+            except Exception:
+                continue
+            out.append((sym, df, sig))
+        out.sort(key=lambda x: (x[2].actionable, x[2].confidence), reverse=True)
+        return out

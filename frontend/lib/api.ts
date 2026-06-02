@@ -92,6 +92,8 @@ export const api = {
     request<any>(
       `/api/market/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&bars=${bars}`
     ),
+  scan: () => request<any>("/api/trading/scan"),
+  universe: () => request<any>("/api/market/universe"),
 };
 
 export function wsUrl(): string {

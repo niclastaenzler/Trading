@@ -8,7 +8,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_user_config, require_owner
+from app.api.deps import get_current_user, get_user_config, require_owner
 from app.core.database import get_db
 from app.core.encryption import decrypt
 from app.core.redis_client import get_redis
@@ -49,12 +49,62 @@ async def run_cycle(
     engine = TradingEngine(db, user.id, cfg, broker)
     symbols = cfg.data.get("trading", {}).get("allowed_symbols", ["EURUSD"])
 
+    # AI ranks the whole universe; we act on the strongest ideas first. The
+    # max-open-positions / risk / compliance gates limit how many actually open.
+    ranked = await engine.scan(symbols)
     closed = await engine.monitor_positions()
     results = []
-    for symbol in symbols:
-        ohlcv = await fetch_ohlcv(symbol, bars=200, broker=broker)
-        results.append(await engine.process_symbol(symbol, ohlcv))
+    for sym, df, _sig in ranked:
+        results.append(await engine.process_symbol(sym, df))
     return {"cycle": "complete", "closed": closed, "results": results}
+
+
+@router.get("/scan")
+async def scan_market(
+    cfg: TradingConfig = Depends(get_user_config),
+    user: User = Depends(get_current_user),
+):
+    """KI-Marktanalyse: rank every configured symbol best-first without trading.
+    Shows WHAT the AI would trade and why the rest is skipped."""
+    broker = _build_broker(user)
+    try:
+        await broker.connect()
+    except Exception:
+        pass
+    from app.services.trading_engine import TradingEngine as _TE  # local import ok
+
+    engine = _TE(None, user.id, cfg, broker)  # no DB needed for a read-only scan
+    symbols = cfg.data.get("trading", {}).get("allowed_symbols", ["EURUSD"])
+    try:
+        ranked = await engine.scan(symbols)
+    finally:
+        if hasattr(broker, "aclose"):
+            await broker.aclose()
+
+    def reason(sig) -> str:
+        c = sig.components or {}
+        if sig.actionable:
+            return ""
+        if c.get("vetoed_by_trend"):
+            return "gegen Trend"
+        if c.get("below_threshold"):
+            return "unter Konfidenzschwelle"
+        return "kein klares Signal"
+
+    return {
+        "opportunities": [
+            {
+                "symbol": s,
+                "action": "BUY" if sig.direction > 0 else ("SELL" if sig.direction < 0 else "—"),
+                "direction": sig.direction,
+                "confidence": round(sig.confidence, 4),
+                "price": round(sig.price, 6),
+                "actionable": sig.actionable,
+                "reason": reason(sig),
+            }
+            for (s, _df, sig) in ranked
+        ]
+    }
 
 
 @router.get("/pending")

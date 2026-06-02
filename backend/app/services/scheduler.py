@@ -39,16 +39,18 @@ async def _run_user_cycle(user: User, cfg_row: TradingConfig) -> None:
         await broker.connect()
         engine = TradingEngine(db, user.id, cfg_row, broker)
 
-        # 1. Honour protective levels on already-open positions.
-        await engine.monitor_positions()
-
-        # 2. Look for new entries.
+        # 1. AI ranks the whole universe (what to trade).
         symbols = (cfg_row.data or {}).get("trading", {}).get(
             "allowed_symbols", ["EURUSD"]
         )
-        for symbol in symbols:
-            ohlcv = await fetch_ohlcv(symbol, bars=200, broker=broker)
-            await engine.process_symbol(symbol, ohlcv)
+        ranked = await engine.scan(symbols)
+
+        # 2. Honour protective levels on already-open positions.
+        await engine.monitor_positions()
+
+        # 3. Act on the strongest ideas first (gates limit how many open).
+        for sym, df, _sig in ranked:
+            await engine.process_symbol(sym, df)
         await db.commit()
 
 
