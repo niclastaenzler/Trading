@@ -141,6 +141,22 @@ export default function ConfigPage() {
             />
           </div>
         </div>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>
+          <input
+            type="checkbox"
+            style={{ width: "auto" }}
+            checked={(cfg.trading.session_windows_utc || []).length === 0}
+            onChange={(e) =>
+              upd("trading.session_windows_utc", e.target.checked ? [] : [["07:00", "16:00"]])
+            }
+          />
+          Rund um die Uhr handeln (kein Zeitfenster)
+        </label>
+        <p style={{ color: "var(--muted)", fontSize: 12 }}>
+          Aktiv: {(cfg.trading.session_windows_utc || []).length === 0
+            ? "immer (24/7)"
+            : (cfg.trading.session_windows_utc || []).map((w: string[]) => `${w[0]}–${w[1]} UTC`).join(", ")}
+        </p>
       </fieldset>
 
       <fieldset className="fieldset">
