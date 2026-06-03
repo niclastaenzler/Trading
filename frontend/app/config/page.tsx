@@ -115,6 +115,21 @@ export default function ConfigPage() {
     }
   }
 
+  async function resetAccount() {
+    if (!window.confirm(
+      "Wirklich ALLES zurücksetzen?\n\n• Trade-Verlauf wird gelöscht\n• Kontostand & Höchststand zurückgesetzt\n• Tagesverlust = 0, Not-Aus aufgehoben\n\nDeine Einstellungen (Risiko, Märkte …) bleiben erhalten."
+    )) return;
+    setErr(""); setMsg("");
+    try {
+      const res: any = await api.resetAccount();
+      const r: any = await api.getConfig();
+      setCfg(r.config);
+      setMsg(res.message || "Konto zurückgesetzt.");
+    } catch (e: any) {
+      setErr(e.message);
+    }
+  }
+
   // Voreingestellte Trading-Profile als Startpunkte. Nach dem Anwenden noch
   // „Speichern" klicken. Werte sind frei wählbar — der Risiko-Check zeigt die Folgen.
   const PRESETS: Record<string, any> = {
@@ -432,6 +447,22 @@ export default function ConfigPage() {
 
         <button onClick={save}>💾 Erweiterte Einstellungen speichern</button>
       </details>
+
+      {/* ───────── Danger Zone: kompletter Neustart ───────── */}
+      <div
+        className="card"
+        style={{ marginTop: 16, border: "1px solid var(--red, #e74c3c)" }}
+      >
+        <h3 style={{ color: "var(--red, #e74c3c)", marginTop: 0 }}>🧹 Alles zurücksetzen</h3>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
+          Sauberer Neustart, wenn der Bot wegen Tagesverlust oder Drawdown „klemmt":
+          löscht den <b>Trade-Verlauf</b>, setzt <b>Kontostand</b> &amp; <b>Höchststand</b>{" "}
+          zurück (→ Tagesverlust = 0), und hebt den <b>Not-Aus</b> auf. Deine
+          Einstellungen (Risiko, Märkte, Profile) bleiben erhalten. Auto-Handel wird
+          danach auf AUS gesetzt — du schaltest ihn bewusst wieder ein.
+        </p>
+        <button className="danger" onClick={resetAccount}>🧹 Konto &amp; Verlauf zurücksetzen</button>
+      </div>
     </div>
   );
 }

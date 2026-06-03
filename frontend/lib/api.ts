@@ -72,6 +72,7 @@ export const api = {
     }),
   killSwitch: (activate: boolean) =>
     request(`/api/config/kill-switch?activate=${activate}`, { method: "POST" }),
+  resetAccount: () => request<any>("/api/config/reset-account", { method: "POST" }),
   performance: () => request<any>("/api/trades/performance"),
   trades: () => request<any[]>("/api/trades"),
   pending: () => request<any>("/api/trading/pending"),
