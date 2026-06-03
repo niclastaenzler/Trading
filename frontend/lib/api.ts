@@ -3,6 +3,10 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// On GitHub Pages the app is served under /<repo> (e.g. /Trading). Hard
+// redirects must include this prefix or they escape the site -> GitHub 404.
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("token");
@@ -27,7 +31,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
   if (res.status === 401) {
     clearToken();
-    if (typeof window !== "undefined") window.location.href = "/login";
+    if (typeof window !== "undefined" && !window.location.pathname.endsWith("/login/")) {
+      window.location.href = `${BASE_PATH}/login/`;
+    }
   }
   if (!res.ok) {
     const detail = await res.text();

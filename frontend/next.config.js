@@ -16,6 +16,8 @@ const nextConfig = {
         assetPrefix: basePath || undefined,
         trailingSlash: true, // emit /page/index.html -> no 404 on refresh
         images: { unoptimized: true },
+        // Expose basePath to client code (hard redirects in lib/api).
+        env: { NEXT_PUBLIC_BASE_PATH: basePath },
       }
     : {}),
 };

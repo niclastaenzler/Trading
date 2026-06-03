@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { api, getToken, wsUrl } from "@/lib/api";
+import { api, getToken, wsUrl, BASE_PATH } from "@/lib/api";
 
 const EquityChart = dynamic(() => import("@/app/components/EquityChart"), { ssr: false });
 const CandleChart = dynamic(() => import("@/app/components/CandleChart"), { ssr: false });
@@ -304,7 +304,7 @@ export default function Dashboard() {
         <div className="card">
           <h3 className="row" style={{ justifyContent: "space-between" }}>
             <span>Letzte Trades</span>
-            <a href="/Trading/trades/" style={{ fontSize: 13 }}>alle →</a>
+            <a href={`${BASE_PATH}/trades/`} style={{ fontSize: 13 }}>alle →</a>
           </h3>
           {recentTrades.length === 0 ? (
             <p style={{ color: "var(--muted)", fontSize: 13 }}>Noch keine Trades.</p>
