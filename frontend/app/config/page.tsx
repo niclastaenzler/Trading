@@ -183,6 +183,7 @@ export default function ConfigPage() {
         <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 12, wordBreak: "break-word" }}>
           {(cfg.trading.allowed_symbols || []).join(", ") || "— keine —"}
         </p>
+        <button onClick={save} style={{ marginTop: 4 }}>💾 Märkte speichern</button>
       </div>
 
       <fieldset className="fieldset">

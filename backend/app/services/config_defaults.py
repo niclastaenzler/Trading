@@ -47,10 +47,8 @@ class TradingSettings(BaseModel):
     allowed_assets: list[AssetClass] = Field(default_factory=lambda: [AssetClass.forex])
     allowed_symbols: list[str] = Field(default_factory=lambda: ["EURUSD"])
     timeframes: list[Timeframe] = Field(default_factory=lambda: [Timeframe.h1])
-    # Trade only inside these UTC sessions (24h format). Empty = always.
-    session_windows_utc: list[tuple[str, str]] = Field(
-        default_factory=lambda: [("07:00", "16:00")]
-    )
+    # Trade only inside these UTC sessions (24h format). Empty = always (24/7).
+    session_windows_utc: list[tuple[str, str]] = Field(default_factory=list)
 
 
 # ───────────────────────── Strategy settings ─────────────────────────
