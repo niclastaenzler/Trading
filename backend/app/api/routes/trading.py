@@ -58,7 +58,9 @@ async def run_cycle(
     closed = await engine.monitor_positions()
     results = []
     for sym, df, _sig in ranked:
-        results.append(await engine.process_symbol(sym, df))
+        # Manual trigger: bypass the auto-trading toggle (kill switch / session /
+        # cadence / manual confirmation still apply).
+        results.append(await engine.process_symbol(sym, df, force_auto=True))
     return {"cycle": "complete", "closed": closed, "results": results}
 
 

@@ -76,8 +76,15 @@ class TradingEngine:
         return float(sum(p or 0.0 for p in result.scalars().all()))
 
     # --- main entrypoint ---
-    async def process_symbol(self, symbol: str, ohlcv: pd.DataFrame) -> dict:
-        """Run the pipeline for one symbol. Returns a structured outcome."""
+    async def process_symbol(
+        self, symbol: str, ohlcv: pd.DataFrame, force_auto: bool = False
+    ) -> dict:
+        """Run the pipeline for one symbol. Returns a structured outcome.
+
+        `force_auto=True` (manual 'Run cycle now') bypasses the auto-trading
+        toggle, which only gates the background scheduler — the kill switch,
+        sessions, cadence and manual confirmation still apply.
+        """
         sent = await get_sentiment(symbol) if self.cfg.strategy.use_sentiment else 0.0
         signal = generate_signal(symbol, ohlcv, self.cfg.strategy, self.cfg.edge, sent)
 
@@ -91,7 +98,11 @@ class TradingEngine:
         )
 
         if not signal.actionable:
-            return {"action": "none", "symbol": symbol, "signal": asdict(signal)}
+            c = signal.components or {}
+            why = (c.get("edge_rejected") or ("gegen Trend" if c.get("vetoed_by_trend") else None)
+                   or ("unter Konfidenzschwelle" if c.get("below_threshold") else "kein klares Signal"))
+            return {"action": "none", "symbol": symbol, "reason": why,
+                    "confidence": signal.confidence, "edge_score": signal.edge_score}
 
         equity = await self.broker.get_balance()
         plan = self.risk.build_plan(signal, equity)
@@ -115,11 +126,11 @@ class TradingEngine:
             )
             return {"action": "blocked", "stage": "risk", "reason": verdict.reason}
 
-        # Compliance gate.
+        # Compliance gate. Manual cycles bypass the auto-trading toggle.
         decision = await self.compliance.check(
             signal=signal,
             kill_switch=self.config_row.kill_switch_active,
-            auto_trading=self.config_row.auto_trading_enabled,
+            auto_trading=self.config_row.auto_trading_enabled or force_auto,
         )
         if not decision.allowed:
             await log_audit(

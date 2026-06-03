@@ -178,8 +178,15 @@ export default function Dashboard() {
       const blocked = res.filter((x) => x.action === "blocked");
       const parts: string[] = [];
       if (exec) parts.push(`${exec} ausgeführt`);
-      if (pend) parts.push(`${pend} wartet auf Bestätigung (siehe unten)`);
-      if (none) parts.push(`${none}× kein Signal`);
+      if (pend) parts.push(`${pend} wartet auf Bestätigung (unten „Annehmen")`);
+      if (none) {
+        // Show WHY nothing was actionable (dominant reason across symbols).
+        const reasons = res.filter((x) => x.action === "none").map((x) => x.reason || "kein Signal");
+        const counts: Record<string, number> = {};
+        reasons.forEach((rs) => (counts[rs] = (counts[rs] || 0) + 1));
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v}× ${k}`);
+        parts.push(`kein handelbares Setup (${top.join(", ")})`);
+      }
       if (blocked.length) {
         const reasons = Array.from(new Set(blocked.map((b) => REASONS[b.reason] || b.reason)));
         parts.push(`${blocked.length}× blockiert: ${reasons.join(", ")}`);
