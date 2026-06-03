@@ -104,7 +104,10 @@ class RiskSettings(BaseModel):
     take_profit_rr: float = Field(2.0, ge=0.5, le=10, description="Reward:risk ratio")
     trailing_stop_enabled: bool = False
     trailing_stop_value: float = Field(1.0, gt=0, le=20)
-    daily_loss_limit_pct: float = Field(3.0, ge=0.5, le=10)
+    daily_loss_limit_pct: float = Field(
+        3.0, ge=0.5, le=50,
+        description="Max loss per day in % before the engine halts. User-controlled.",
+    )
     max_drawdown_pct: float = Field(10.0, ge=2, le=30)
     require_stop_loss: bool = Field(True, description="Block trades without a stop")
     # Scale position size by model confidence (within the risk-per-trade budget).
@@ -169,7 +172,9 @@ class TradingConfigModel(BaseModel):
                 self.compliance.min_seconds_between_trades, 30
             )
             self.risk.require_stop_loss = True
-            self.risk.daily_loss_limit_pct = min(self.risk.daily_loss_limit_pct, 5.0)
+            # The daily loss limit is the user's own risk preference (when to
+            # stop for the day) and stays fully user-controlled (0.5–50%); only
+            # the mandatory stop-loss and per-trade risk cap are enforced here.
 
         # Independent of compliance mode: a stop loss is mandatory by design.
         if not self.risk.require_stop_loss:

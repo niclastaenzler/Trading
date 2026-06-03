@@ -305,7 +305,7 @@ export default function ConfigPage() {
           {N("Take-Profit (Chance:Risiko)", "risk.take_profit_rr", "any",
             "Gewinnziel relativ zum Risiko. 2,0 = Ziel ist doppelt so weit wie der Stop.")}
           {N("Tagesverlust-Limit (%)", "risk.daily_loss_limit_pct", "any",
-            "Maximaler Verlust pro Tag in % — danach stoppt der Handel automatisch.")}
+            "Maximaler Verlust pro Tag in % — danach stoppt der Handel automatisch. Frei einstellbar 0,5–50 %.")}
           {N("Max. Drawdown (%)", "risk.max_drawdown_pct", "any",
             "Maximaler Rückgang vom Höchststand, bevor der Handel pausiert.")}
         </div>
