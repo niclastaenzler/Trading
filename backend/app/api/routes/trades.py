@@ -211,13 +211,19 @@ async def account_info(user: User = Depends(get_current_user)):
     broker = _build_user_broker(user)
     try:
         await broker.connect()
-        balance = await broker.get_balance()
+        acc = await broker.get_account()
         positions = await broker.get_positions()
         return {
             "broker": broker.name,
             "mode": "demo/paper" if broker.is_paper else "LIVE",
             "is_paper": broker.is_paper,
-            "balance": round(float(balance), 2),
+            # equity = Kontowert; available = freie Margin; used_margin = genutzt
+            "equity": round(float(acc.get("equity", 0.0)), 2),
+            "available": round(float(acc.get("available", 0.0)), 2),
+            "used_margin": round(float(acc.get("used_margin", 0.0)), 2),
+            "profit_loss": round(float(acc.get("profit_loss", 0.0)), 2),
+            "currency": acc.get("currency", ""),
+            "balance": round(float(acc.get("equity", 0.0)), 2),  # back-compat
             "open_positions": len(positions),
             "unrealized_pnl": round(sum(p.unrealized_pnl for p in positions), 2),
             "ok": True,

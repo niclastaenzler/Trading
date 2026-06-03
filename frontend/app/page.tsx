@@ -141,7 +141,13 @@ export default function Dashboard() {
         debounceRef.current = setTimeout(() => refreshRef.current(), 500);
       }
     };
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); ws.close(); };
+    // Keep the account/margin/positions live like a real platform.
+    const liveId = setInterval(() => refreshRef.current(), 30000);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      clearInterval(liveId);
+      ws.close();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -216,48 +222,48 @@ export default function Dashboard() {
         <div className="banner">🛑 NOT-AUS AKTIV — der automatische Handel ist gestoppt.</div>
       )}
 
-      {/* Konto-Ticker (Platform-Header) */}
+      {/* Konto-Ticker (Platform-Header, wie bei Capital) */}
       <div className="ticker">
         <div className="tk">
-          <span className="lbl">KONTOSTAND</span>
-          <span className="val mono">{(account?.balance ?? perf.equity)?.toLocaleString()} </span>
-        </div>
-        <div className="sep" />
-        <div className="tk">
-          <span className="lbl">NICHT REAL. PnL</span>
-          <span className={`val mono ${(account?.unrealized_pnl ?? 0) >= 0 ? "pos" : "neg"}`}>
-            {account?.unrealized_pnl ?? 0}
+          <span className="lbl">KONTOWERT</span>
+          <span className="val mono">
+            {(account?.equity ?? perf.equity)?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {account?.currency ? ` ${account.currency}` : ""}
           </span>
         </div>
+        <div className="tk">
+          <span className="lbl">VERFÜGBARE MARGIN</span>
+          <span className="val mono">{(account?.available ?? 0)?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+        </div>
+        <div className="tk">
+          <span className="lbl">GENUTZTE MARGIN</span>
+          <span className="val mono">{(account?.used_margin ?? 0)?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+        </div>
+        <div className="tk">
+          <span className="lbl">OFFENER G/V</span>
+          <span className={`val mono ${(account?.profit_loss ?? account?.unrealized_pnl ?? 0) >= 0 ? "pos" : "neg"}`}>
+            {(account?.profit_loss ?? account?.unrealized_pnl ?? 0)?.toFixed(2)}
+          </span>
+        </div>
+        <div className="sep" />
         <div className="tk">
           <span className="lbl">PnL HEUTE</span>
-          <span className={`val mono ${perf.realized_pnl_today >= 0 ? "pos" : "neg"}`}>
-            {perf.realized_pnl_today?.toFixed(2)}
-          </span>
+          <span className={`val mono ${perf.realized_pnl_today >= 0 ? "pos" : "neg"}`}>{perf.realized_pnl_today?.toFixed(2)}</span>
         </div>
-        <div className="tk">
-          <span className="lbl">GESAMT-PnL</span>
-          <span className={`val mono ${perf.total_pnl >= 0 ? "pos" : "neg"}`}>{perf.total_pnl?.toFixed(2)}</span>
-        </div>
-        <div className="sep" />
         <div className="tk">
           <span className="lbl">OFFENE POS.</span>
           <span className="val mono">{account?.open_positions ?? perf.open_positions}</span>
         </div>
-        <div className="tk">
-          <span className="lbl">BROKER</span>
-          <span className="val" style={{ fontSize: 15 }}>
-            {account?.broker ?? "—"}{" "}
-            <span className={`pill ${account?.is_paper === false ? "on" : "off"}`} style={{ fontSize: 10 }}>
-              {account?.mode ?? "—"}
-            </span>
-          </span>
-        </div>
         <div className="sep" />
         <div className="tk">
-          <span className="lbl">AUTO-HANDEL</span>
-          <span className={`val ${cfg.auto_trading_enabled ? "pos" : "neg"}`} style={{ fontSize: 15 }}>
-            {cfg.auto_trading_enabled ? "● AKTIV" : "○ AUS"}
+          <span className="lbl">{account?.broker === "capital_com" ? "CAPITAL.COM" : (account?.broker || "BROKER")}</span>
+          <span className="val" style={{ fontSize: 15 }}>
+            <span className={`pill ${account?.is_paper === false ? "on" : "off"}`} style={{ fontSize: 10 }}>
+              {account?.ok === false ? "offline" : account?.mode ?? "—"}
+            </span>{" "}
+            <span className={cfg.auto_trading_enabled ? "pos" : "neg"} style={{ fontSize: 13 }}>
+              {cfg.auto_trading_enabled ? "● Auto" : "○ Auto"}
+            </span>
           </span>
         </div>
       </div>

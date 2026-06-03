@@ -70,12 +70,29 @@ class CapitalComBroker(BrokerInterface):
         logger.info("capital.com session opened", extra={"demo": self.is_paper})
 
     async def get_balance(self) -> float:
+        acc = await self.get_account()
+        return float(acc.get("equity", 0.0))
+
+    async def get_account(self) -> dict:
+        """Full account snapshot from /accounts (equity, available & used margin,
+        open P/L, currency) — for a realistic broker-style header."""
         resp = await self._client.get("/api/v1/accounts", headers=self._auth_headers())
         resp.raise_for_status()
         accounts = resp.json().get("accounts", [])
         if not accounts:
-            return 0.0
-        return float(accounts[0].get("balance", {}).get("available", 0.0))
+            return {}
+        a = accounts[0]
+        bal = a.get("balance", {}) or {}
+        equity = float(bal.get("balance", 0.0))        # account value
+        available = float(bal.get("available", 0.0))   # free margin
+        return {
+            "equity": equity,
+            "available": available,
+            "used_margin": round(max(0.0, equity - available), 2),
+            "deposit": float(bal.get("deposit", 0.0)),
+            "profit_loss": float(bal.get("profitLoss", 0.0)),
+            "currency": a.get("currency", ""),
+        }
 
     async def get_price(self, symbol: str) -> float:
         resp = await self._client.get(

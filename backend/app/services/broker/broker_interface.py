@@ -50,6 +50,15 @@ class BrokerInterface(abc.ABC):
     async def get_balance(self) -> float:
         """Account equity in account currency."""
 
+    async def get_account(self) -> dict:
+        """Account snapshot: equity, available/used margin, open P/L, currency.
+        Default derives a simple view from the balance (no margin concept)."""
+        bal = await self.get_balance()
+        return {
+            "equity": bal, "available": bal, "used_margin": 0.0,
+            "deposit": bal, "profit_loss": 0.0, "currency": "USD",
+        }
+
     @abc.abstractmethod
     async def get_price(self, symbol: str) -> float:
         """Latest mid price for `symbol`."""

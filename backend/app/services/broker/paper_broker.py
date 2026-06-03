@@ -42,6 +42,19 @@ class PaperBroker(BrokerInterface):
         bal = await get_redis().get(self._bal_key)
         return float(bal) if bal else self.starting_balance
 
+    async def get_account(self) -> dict:
+        cash = await self.get_balance()
+        positions = await self.get_positions()
+        upnl = round(sum(p.unrealized_pnl for p in positions), 2)
+        return {
+            "equity": round(cash + upnl, 2),
+            "available": round(cash, 2),
+            "used_margin": 0.0,
+            "deposit": round(self.starting_balance, 2),
+            "profit_loss": upnl,
+            "currency": "USD",
+        }
+
     async def get_price(self, symbol: str) -> float:
         return self._prices.get(symbol, 0.0)
 
