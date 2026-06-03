@@ -108,15 +108,15 @@ export default function ConfigPage() {
     setErr(""); setMsg("");
     try {
       const res: any = await api.updateConfig(cfg);
-      setCfg(res.config); // reflect server-side clamping (compliance envelope)
-      setMsg("Gespeichert. Die Werte spiegeln die erzwungene Compliance-Hülle wider.");
+      setCfg(res.config); // reflect server-side normalisation (e.g. cooldown floor)
+      setMsg("Gespeichert ✓ Deine Einstellungen sind aktiv.");
     } catch (e: any) {
       setErr(e.message);
     }
   }
 
-  // Voreingestellte Trading-Profile. Nach dem Anwenden noch „Speichern" klicken;
-  // das Backend klemmt zu riskante Werte über die Compliance-Hülle automatisch.
+  // Voreingestellte Trading-Profile als Startpunkte. Nach dem Anwenden noch
+  // „Speichern" klicken. Werte sind frei wählbar — der Risiko-Check zeigt die Folgen.
   const PRESETS: Record<string, any> = {
     Konservativ: {
       "trading.risk_per_trade_pct": 0.5, "trading.max_open_positions": 2,
@@ -137,12 +137,12 @@ export default function ConfigPage() {
       "compliance.compliance_mode": true,
     },
     Aggressiv: {
-      "trading.risk_per_trade_pct": 1.0, "trading.max_open_positions": 5,
-      "strategy.signal_confidence_threshold": 0.6,
-      "automation.manual_confirmation": false, "automation.max_trades_per_hour": 6,
-      "automation.max_trades_per_day": 20, "automation.cooldown_seconds": 60,
+      "trading.risk_per_trade_pct": 2.0, "trading.max_open_positions": 10,
+      "strategy.signal_confidence_threshold": 0.58,
+      "automation.manual_confirmation": false, "automation.max_trades_per_hour": 15,
+      "automation.max_trades_per_day": 60, "automation.cooldown_seconds": 30,
       "risk.stop_loss_value": 1.0, "risk.take_profit_rr": 1.5,
-      "risk.daily_loss_limit_pct": 5.0, "risk.max_drawdown_pct": 12.0,
+      "risk.daily_loss_limit_pct": 10.0, "risk.max_drawdown_pct": 20.0,
       "compliance.compliance_mode": true,
     },
   };
@@ -183,6 +183,23 @@ export default function ConfigPage() {
     );
   };
 
+  // Live-Risiko-Check: übersetzt die Zahlen in Klartext. Ersetzt die früheren
+  // Hard-Caps durch eine informierte Entscheidung — der Worst-Case ist, dass alle
+  // offenen Positionen gleichzeitig ihren Stop-Loss auslösen.
+  const riskPerTrade = Number(cfg.trading.risk_per_trade_pct) || 0;
+  const maxOpen = Number(cfg.trading.max_open_positions) || 0;
+  const worstCase = riskPerTrade * maxOpen; // % vom Konto, wenn alle Stops fallen
+  const auto = !cfg.automation.manual_confirmation;
+  const around = (cfg.trading.session_windows_utc || []).length === 0;
+  const risk =
+    worstCase <= 5
+      ? { color: "var(--green)", bg: "rgba(46,204,113,.10)", label: "Konservativ", icon: "🛡️" }
+      : worstCase <= 15
+      ? { color: "#d4a72c", bg: "rgba(212,167,44,.12)", label: "Ausgewogen", icon: "⚖️" }
+      : worstCase <= 40
+      ? { color: "#e67e22", bg: "rgba(230,126,34,.12)", label: "Aggressiv", icon: "🔥" }
+      : { color: "var(--red, #e74c3c)", bg: "rgba(231,76,60,.12)", label: "Sehr riskant", icon: "⚠️" };
+
   return (
     <div>
       <h2>Konfiguration</h2>
@@ -192,8 +209,9 @@ export default function ConfigPage() {
       <div className="card" style={{ marginBottom: 16 }}>
         <h3>Voreinstellungen (Trading-Profile)</h3>
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
-          Schnellstart-Profile. Nach dem Anwenden unten „Speichern" klicken. Zu riskante
-          Werte werden durch die Compliance-Hülle automatisch begrenzt.
+          Schnellstart-Profile. Nach dem Anwenden unten „Speichern" klicken. Du kannst
+          danach jeden Wert frei anpassen — der Risiko-Check unten zeigt dir, was deine
+          Einstellung bedeutet.
         </p>
         <div className="row">
           <button className="secondary" onClick={() => applyPreset("Konservativ")}>🛡️ Konservativ</button>
@@ -259,6 +277,33 @@ export default function ConfigPage() {
           />
           Rund um die Uhr handeln (kein Zeitfenster)
         </label>
+
+        {/* Live-Risiko-Check — Klartext statt Hard-Caps */}
+        <div
+          style={{
+            marginTop: 18, padding: "12px 14px", borderRadius: 10,
+            border: `1px solid ${risk.color}`, background: risk.bg,
+          }}
+        >
+          <div style={{ fontWeight: 600, color: risk.color, marginBottom: 6 }}>
+            {risk.icon} Risiko-Check: {risk.label}
+          </div>
+          <div style={{ fontSize: 13, lineHeight: 1.55 }}>
+            Du riskierst <b>{riskPerTrade}%</b> pro Trade bei bis zu <b>{maxOpen}</b>{" "}
+            gleichzeitigen Positionen. Im schlimmsten Fall (alle Stops fallen auf einmal)
+            wären das <b>≈ {worstCase.toFixed(1)}%</b> deines Kontos auf einmal.
+            {worstCase > 40 && (
+              <> <b style={{ color: risk.color }}>Das ist sehr viel</b> — auf echtem Geld
+              könntest du damit einen großen Teil des Kontos an einem schlechten Tag verlieren.</>
+            )}
+            <br />
+            Der Handel stoppt automatisch, sobald dein Tagesverlust{" "}
+            <b>{Number(cfg.risk.daily_loss_limit_pct) || 0}%</b> erreicht.{" "}
+            {auto ? "Trades laufen vollautomatisch." : "Du bestätigst jeden Trade selbst."}{" "}
+            {around ? "Gehandelt wird rund um die Uhr." : "Gehandelt wird nur im Zeitfenster."}
+          </div>
+        </div>
+
         <button onClick={save} style={{ marginTop: 16 }}>💾 Speichern</button>
       </fieldset>
 
