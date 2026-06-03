@@ -224,21 +224,30 @@ export default function ConfigPage() {
         <button onClick={save} style={{ marginTop: 4 }}>💾 Märkte speichern</button>
       </div>
 
+      {/* ───────── Einfach: nur das Wichtigste ───────── */}
       <fieldset className="fieldset">
-        <legend>Trading</legend>
+        <legend>Einstellungen</legend>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
+          Tipp: Wähle oben einfach ein Profil — dann passt alles automatisch. Hier kannst
+          du die wichtigsten Werte noch von Hand anpassen.
+        </p>
         <div className="grid">
           {N("Risiko pro Trade (%)", "trading.risk_per_trade_pct", "any",
-            "Wie viel % deines Kontos pro Trade riskiert wird (Verlust bis zum Stop-Loss). Konservativ: 0,5–1 %.")}
-          {N("Max. offene Positionen", "trading.max_open_positions", "1",
-            "Wie viele Positionen gleichzeitig offen sein dürfen. Begrenzt das Gesamtrisiko.")}
-          <div>
-            <label>Erlaubte Symbole (durch Komma getrennt)</label>
-            <input
-              value={(cfg.trading.allowed_symbols || []).join(",")}
-              onChange={(e) => upd("trading.allowed_symbols", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-            />
-          </div>
+            "Wie viel % deines Kontos pro Trade eingesetzt wird. Höher = größere Gewinne UND Verluste.")}
+          {N("Max. gleichzeitige Trades", "trading.max_open_positions", "1",
+            "Wie viele Positionen gleichzeitig offen sein dürfen.")}
+          {N("Tagesverlust-Limit (%)", "risk.daily_loss_limit_pct", "any",
+            "Verlierst du an einem Tag so viele %, stoppt der Handel automatisch für den Tag.")}
         </div>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>
+          <input
+            type="checkbox"
+            style={{ width: "auto" }}
+            checked={!cfg.automation.manual_confirmation}
+            onChange={(e) => upd("automation.manual_confirmation", !e.target.checked)}
+          />
+          Vollautomatisch handeln (du musst keinen Trade einzeln bestätigen)
+        </label>
         <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>
           <input
             type="checkbox"
@@ -250,109 +259,116 @@ export default function ConfigPage() {
           />
           Rund um die Uhr handeln (kein Zeitfenster)
         </label>
-        <p style={{ color: "var(--muted)", fontSize: 12 }}>
-          Aktiv: {(cfg.trading.session_windows_utc || []).length === 0
-            ? "immer (24/7)"
-            : (cfg.trading.session_windows_utc || []).map((w: string[]) => `${w[0]}–${w[1]} UTC`).join(", ")}
+        <button onClick={save} style={{ marginTop: 16 }}>💾 Speichern</button>
+      </fieldset>
+
+      {/* ───────── Erweitert: eingeklappt, optional ───────── */}
+      <details className="card" style={{ marginTop: 16 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 15 }}>
+          ⚙️ Erweiterte Einstellungen (optional — kannst du ignorieren)
+        </summary>
+        <p style={{ color: "var(--muted)", fontSize: 13 }}>
+          Nur ändern, wenn du genau weißt, was du tust. Sonst reichen Profil + die
+          Werte oben völlig aus.
         </p>
-      </fieldset>
 
-      <fieldset className="fieldset">
-        <legend>Strategie</legend>
-        {B("KI-Modell aktiv", "strategy.ai_model_enabled",
-          "Nutzt das trainierte ML-Modell (sonst nur Indikatoren/Muster).")}
-        {B("Mustererkennung aktiv", "strategy.pattern_recognition_enabled",
-          "Erkennt Candlestick-Muster & Ausbrüche als zusätzliches Signal.")}
-        {B("Trendfilter aktiv", "strategy.trend_filter_enabled",
-          "Handelt nur in Trendrichtung (kein Gegen-den-Trend-Handel).")}
-        {B("News-/Sentiment-Overlay (Platzhalter)", "strategy.use_sentiment",
-          "Vorbereitet, aber inaktiv bis eine echte News-Datenquelle angebunden ist — wirkt aktuell neutral.")}
-        <div className="grid">
-          {N("Signal-Konfidenzschwelle", "strategy.signal_confidence_threshold", "any",
-            "Mindest-Konfidenz (0,5–0,99), bevor überhaupt gehandelt wird. Höher = weniger, aber sicherere Trades.")}
-          {N("RSI-Länge", "strategy.indicators.rsi_length", "1")}
-          {N("MACD schnell", "strategy.indicators.macd_fast", "1")}
-          {N("MACD langsam", "strategy.indicators.macd_slow", "1")}
-          {N("MACD Signal", "strategy.indicators.macd_signal", "1")}
-          {N("EMA schnell", "strategy.indicators.ema_fast", "1")}
-          {N("EMA langsam", "strategy.indicators.ema_slow", "1")}
-          {N("ATR-Länge", "strategy.indicators.atr_length", "1")}
-        </div>
-      </fieldset>
-
-      <fieldset className="fieldset">
-        <legend>Automatisierung</legend>
-        {B("Manuelle Bestätigung (Halb-Automatik)", "automation.manual_confirmation")}
-        <div className="grid">
-          {N("Max. Trades / Stunde", "automation.max_trades_per_hour", "1")}
-          {N("Max. Trades / Tag", "automation.max_trades_per_day", "1")}
-          {N("Abkühlzeit zwischen Trades (s)", "automation.cooldown_seconds", "1")}
-        </div>
-      </fieldset>
-
-      <fieldset className="fieldset">
-        <legend>Risikomanagement</legend>
-        <div className="grid">
-          <div>
-            <label>Stop-Loss-Typ</label>
-            <select value={cfg.risk.stop_loss_type} onChange={(e) => upd("risk.stop_loss_type", e.target.value)}>
-              <option value="atr">ATR-Vielfaches</option>
-              <option value="percent">Prozent</option>
-            </select>
+        <fieldset className="fieldset">
+          <legend>Strategie</legend>
+          {B("KI-Modell aktiv", "strategy.ai_model_enabled",
+            "Nutzt das trainierte ML-Modell (sonst nur Indikatoren/Muster).")}
+          {B("Mustererkennung aktiv", "strategy.pattern_recognition_enabled",
+            "Erkennt Candlestick-Muster & Ausbrüche als zusätzliches Signal.")}
+          {B("Trendfilter aktiv", "strategy.trend_filter_enabled",
+            "Handelt nur in Trendrichtung (kein Gegen-den-Trend-Handel).")}
+          {B("News-/Sentiment-Overlay (Platzhalter)", "strategy.use_sentiment",
+            "Vorbereitet, aber inaktiv bis eine echte News-Datenquelle angebunden ist — wirkt aktuell neutral.")}
+          <div className="grid">
+            {N("Signal-Konfidenzschwelle", "strategy.signal_confidence_threshold", "any",
+              "Mindest-Konfidenz (0,5–0,99), bevor überhaupt gehandelt wird. Höher = weniger, aber sicherere Trades.")}
+            {N("RSI-Länge", "strategy.indicators.rsi_length", "1")}
+            {N("MACD schnell", "strategy.indicators.macd_fast", "1")}
+            {N("MACD langsam", "strategy.indicators.macd_slow", "1")}
+            {N("MACD Signal", "strategy.indicators.macd_signal", "1")}
+            {N("EMA schnell", "strategy.indicators.ema_fast", "1")}
+            {N("EMA langsam", "strategy.indicators.ema_slow", "1")}
+            {N("ATR-Länge", "strategy.indicators.atr_length", "1")}
           </div>
-          {N("Stop-Loss-Wert", "risk.stop_loss_value", "any",
-            "Abstand des Stops: bei ATR = Vielfaches der Schwankung, bei Prozent = % vom Preis.")}
-          {N("Take-Profit (Chance:Risiko)", "risk.take_profit_rr", "any",
-            "Gewinnziel relativ zum Risiko. 2,0 = Ziel ist doppelt so weit wie der Stop.")}
-          {N("Tagesverlust-Limit (%)", "risk.daily_loss_limit_pct", "any",
-            "Maximaler Verlust pro Tag in % — danach stoppt der Handel automatisch. Frei einstellbar 0,5–50 %.")}
-          {N("Max. Drawdown (%)", "risk.max_drawdown_pct", "any",
-            "Maximaler Rückgang vom Höchststand, bevor der Handel pausiert.")}
-        </div>
-        {B("Trailing-Stop aktiv", "risk.trailing_stop_enabled",
-          "Zieht den Stop bei Gewinn nach.")}
-        {B("Positionsgröße nach KI-Konfidenz skalieren", "risk.confidence_scaled_sizing",
-          "Stärkere Signale bekommen größere Positionen (innerhalb des Risiko-Budgets).")}
-      </fieldset>
+        </fieldset>
 
-      <fieldset className="fieldset">
-        <legend>Edge-Layer (selektives Handeln)</legend>
-        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
-          Nur die wirklich attraktiven Setups handeln — Ziel ist besseres, nicht mehr Trading.
-        </p>
-        {B("Edge-Layer aktiv", "edge.enabled",
-          "Filtert schwache Setups heraus — handelt nur, wenn der Kontext stimmt.")}
-        {B("Nur im Trend handeln (Seitwärtsphasen meiden)", "edge.require_trend_regime",
-          "Überspringt choppy/seitwärts laufende Märkte (oft Verlustquelle).")}
-        <div className="grid">
-          {N("Mindest-Edge-Score (0–1)", "edge.min_edge_score", "any",
-            "Gesamtnote aus Konfidenz + Kontext. Höher = selektiver. Empf.: 0,5.")}
-          {N("Mindest-Trendstärke (0–1)", "edge.min_trend_strength", "any",
-            "Wie klar der Trend sein muss (Efficiency Ratio). 0,3 = moderater Trend.")}
-          {N("Max. Volatilitäts-Perzentil (0–1)", "edge.max_volatility_percentile", "any",
-            "Überspringt extrem volatile Phasen. 0,9 = nur die obersten 10 % meiden.")}
-        </div>
-      </fieldset>
-
-      <fieldset className="fieldset">
-        <legend>Compliance</legend>
-        {B("Compliance-Modus (erzwingt konservative Obergrenzen)", "compliance.compliance_mode")}
-        {B("Bei hoher Volatilität pausieren", "compliance.halt_on_high_volatility")}
-        <div className="grid">
-          {N("Max. API-Anfragen / Minute", "compliance.max_api_requests_per_minute", "1")}
-          {N("Min. Sekunden zwischen Trades", "compliance.min_seconds_between_trades", "1")}
-          {N("Volatilitäts-Schwelle (ATR/Preis)", "compliance.high_volatility_atr_ratio")}
-          <div>
-            <label>Protokoll-Stufe</label>
-            <select value={cfg.compliance.logging_level} onChange={(e) => upd("compliance.logging_level", e.target.value)}>
-              <option value="full_audit">Vollständiges Audit</option>
-              <option value="basic">Basis</option>
-            </select>
+        <fieldset className="fieldset">
+          <legend>Trade-Häufigkeit</legend>
+          <div className="grid">
+            {N("Max. Trades / Stunde", "automation.max_trades_per_hour", "1",
+              "Obergrenze pro Stunde. Hoch = mehr Trades möglich.")}
+            {N("Max. Trades / Tag", "automation.max_trades_per_day", "1")}
+            {N("Abkühlzeit zwischen Trades (s)", "automation.cooldown_seconds", "1",
+              "Mindestpause pro Symbol zwischen zwei Trades.")}
           </div>
-        </div>
-      </fieldset>
+        </fieldset>
 
-      <button onClick={save}>Konfiguration speichern</button>
+        <fieldset className="fieldset">
+          <legend>Stop-Loss & Take-Profit</legend>
+          <div className="grid">
+            <div>
+              <label>Stop-Loss-Typ</label>
+              <select value={cfg.risk.stop_loss_type} onChange={(e) => upd("risk.stop_loss_type", e.target.value)}>
+                <option value="atr">ATR-Vielfaches</option>
+                <option value="percent">Prozent</option>
+              </select>
+            </div>
+            {N("Stop-Loss-Wert", "risk.stop_loss_value", "any",
+              "Abstand des Stops: bei ATR = Vielfaches der Schwankung, bei Prozent = % vom Preis.")}
+            {N("Take-Profit (Chance:Risiko)", "risk.take_profit_rr", "any",
+              "Gewinnziel relativ zum Risiko. 2,0 = Ziel ist doppelt so weit wie der Stop.")}
+            {N("Max. Drawdown (%)", "risk.max_drawdown_pct", "any",
+              "Maximaler Rückgang vom Höchststand, bevor der Handel pausiert.")}
+          </div>
+          {B("Trailing-Stop aktiv", "risk.trailing_stop_enabled",
+            "Zieht den Stop bei Gewinn nach.")}
+          {B("Positionsgröße nach KI-Konfidenz skalieren", "risk.confidence_scaled_sizing",
+            "Stärkere Signale bekommen größere Positionen (innerhalb des Risiko-Budgets).")}
+        </fieldset>
+
+        <fieldset className="fieldset">
+          <legend>Edge-Layer (selektives Handeln)</legend>
+          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
+            Nur die wirklich attraktiven Setups handeln — Ziel ist besseres, nicht mehr Trading.
+          </p>
+          {B("Edge-Layer aktiv", "edge.enabled",
+            "Filtert schwache Setups heraus — handelt nur, wenn der Kontext stimmt.")}
+          {B("Nur im Trend handeln (Seitwärtsphasen meiden)", "edge.require_trend_regime",
+            "Überspringt choppy/seitwärts laufende Märkte (oft Verlustquelle).")}
+          <div className="grid">
+            {N("Mindest-Edge-Score (0–1)", "edge.min_edge_score", "any",
+              "Gesamtnote aus Konfidenz + Kontext. Höher = selektiver. Empf.: 0,5.")}
+            {N("Mindest-Trendstärke (0–1)", "edge.min_trend_strength", "any",
+              "Wie klar der Trend sein muss (Efficiency Ratio). 0,3 = moderater Trend.")}
+            {N("Max. Volatilitäts-Perzentil (0–1)", "edge.max_volatility_percentile", "any",
+              "Überspringt extrem volatile Phasen. 0,9 = nur die obersten 10 % meiden.")}
+          </div>
+        </fieldset>
+
+        <fieldset className="fieldset">
+          <legend>Compliance / Sicherheit</legend>
+          {B("Compliance-Modus", "compliance.compliance_mode",
+            "Erzwingt den Pflicht-Stop-Loss. Limits steuerst du selbst.")}
+          {B("Bei hoher Volatilität pausieren", "compliance.halt_on_high_volatility")}
+          <div className="grid">
+            {N("Max. API-Anfragen / Minute", "compliance.max_api_requests_per_minute", "1")}
+            {N("Min. Sekunden zwischen Trades", "compliance.min_seconds_between_trades", "1")}
+            {N("Volatilitäts-Schwelle (ATR/Preis)", "compliance.high_volatility_atr_ratio")}
+            <div>
+              <label>Protokoll-Stufe</label>
+              <select value={cfg.compliance.logging_level} onChange={(e) => upd("compliance.logging_level", e.target.value)}>
+                <option value="full_audit">Vollständiges Audit</option>
+                <option value="basic">Basis</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
+
+        <button onClick={save}>💾 Erweiterte Einstellungen speichern</button>
+      </details>
     </div>
   );
 }

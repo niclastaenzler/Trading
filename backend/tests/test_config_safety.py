@@ -22,13 +22,13 @@ def test_risk_per_trade_hard_cap():
         TradingConfigModel(trading={"risk_per_trade_pct": 50})
 
 
-def test_compliance_mode_clamps_risk():
+def test_risk_per_trade_user_controlled():
     cfg = TradingConfigModel(
         trading={"risk_per_trade_pct": 2.0},
         compliance={"compliance_mode": True},
     )
-    # Clamped to the 1.0% compliance ceiling.
-    assert cfg.trading.risk_per_trade_pct == 1.0
+    # Risk per trade is user-controlled now (not clamped by compliance mode).
+    assert cfg.trading.risk_per_trade_pct == 2.0
 
 
 def test_compliance_mode_forces_stop_loss_back_on():

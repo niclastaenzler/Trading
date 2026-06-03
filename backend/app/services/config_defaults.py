@@ -41,9 +41,9 @@ class StopLossType(str, Enum):
 # ───────────────────────── Trading settings ─────────────────────────
 class TradingSettings(BaseModel):
     risk_per_trade_pct: float = Field(
-        0.5, ge=0.05, le=2.0, description="Risk per trade as % of equity"
+        0.5, ge=0.05, le=20, description="Risk per trade as % of equity"
     )
-    max_open_positions: int = Field(3, ge=1, le=10)
+    max_open_positions: int = Field(3, ge=1, le=50)
     allowed_assets: list[AssetClass] = Field(default_factory=lambda: [AssetClass.forex])
     allowed_symbols: list[str] = Field(default_factory=lambda: ["EURUSD"])
     timeframes: list[Timeframe] = Field(default_factory=lambda: [Timeframe.h1])
@@ -94,7 +94,7 @@ class AutomationSettings(BaseModel):
     )
     max_trades_per_hour: int = Field(2, ge=1, le=60)
     max_trades_per_day: int = Field(6, ge=1, le=1000)
-    cooldown_seconds: int = Field(300, ge=30, le=86400)
+    cooldown_seconds: int = Field(300, ge=5, le=86400)
 
 
 # ───────────────────────── Risk management ─────────────────────────
@@ -154,32 +154,20 @@ class TradingConfigModel(BaseModel):
 
     @model_validator(mode="after")
     def _enforce_compliance_envelope(self) -> "TradingConfigModel":
-        """Hard guardrails. In compliance mode we clamp anything reckless."""
+        """All numeric limits (risk, positions, trade throughput, cadence, loss
+        limit) are user-controlled and bounded only by each field's own range.
+        The single non-negotiable invariant is the mandatory stop loss: in
+        compliance mode a disabled stop is silently corrected, otherwise it is
+        rejected — every trade must carry a protective stop (it is also how
+        positions are sized)."""
         if self.compliance.compliance_mode:
-            # Cap risk and rate, enforce stops + safe cadence.
-            self.trading.risk_per_trade_pct = min(self.trading.risk_per_trade_pct, 1.0)
-            self.trading.max_open_positions = min(self.trading.max_open_positions, 5)
-            # Max trades per hour/day are the user's own throughput preference and
-            # stay user-controlled (bounded only by the field range + the
-            # mandatory per-trade cadence / API rate limiter).
-            self.compliance.max_api_requests_per_minute = min(
-                self.compliance.max_api_requests_per_minute, 120
-            )
-            self.compliance.min_seconds_between_trades = max(
-                self.compliance.min_seconds_between_trades, 30
-            )
             self.risk.require_stop_loss = True
-            # The daily loss limit is the user's own risk preference (when to
-            # stop for the day) and stays fully user-controlled (0.5–50%); only
-            # the mandatory stop-loss and per-trade risk cap are enforced here.
-
-        # Independent of compliance mode: a stop loss is mandatory by design.
         if not self.risk.require_stop_loss:
             raise ValueError(
                 "require_stop_loss cannot be disabled — stops are mandatory."
             )
 
-        # Cooldown must never undercut the compliance min-delay.
+        # Cooldown must never undercut the configured min-delay between trades.
         self.automation.cooldown_seconds = max(
             self.automation.cooldown_seconds,
             self.compliance.min_seconds_between_trades,

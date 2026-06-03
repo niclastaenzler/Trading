@@ -52,17 +52,20 @@ async def test_default_config_is_conservative(owner_client):
     assert res.json()["auto_trading_enabled"] is False
 
 
-async def test_config_update_clamps_reckless_values(owner_client):
+async def test_config_update_is_user_controlled(owner_client):
     current = (await owner_client.get("/api/config")).json()["config"]
-    current["trading"]["risk_per_trade_pct"] = 2.0  # reckless
-    current["automation"]["max_trades_per_hour"] = 30  # user throughput preference
+    current["trading"]["risk_per_trade_pct"] = 3.0
+    current["automation"]["max_trades_per_hour"] = 30
+    current["trading"]["max_open_positions"] = 15
     res = await owner_client.put("/api/config", json={"config": current})
     assert res.status_code == 200
     saved = res.json()["config"]
-    # Compliance envelope still clamps per-trade risk to a safe ceiling.
-    assert saved["trading"]["risk_per_trade_pct"] == 1.0
-    # Trade throughput is user-controlled and preserved (not clamped).
+    # Numeric limits are user-controlled now — preserved, not clamped.
+    assert saved["trading"]["risk_per_trade_pct"] == 3.0
     assert saved["automation"]["max_trades_per_hour"] == 30
+    assert saved["trading"]["max_open_positions"] == 15
+    # The one non-negotiable invariant remains: stops are mandatory.
+    assert saved["risk"]["require_stop_loss"] is True
 
 
 async def test_kill_switch_blocks_auto_trading(owner_client):
