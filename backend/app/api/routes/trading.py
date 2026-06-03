@@ -6,9 +6,11 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_user_config, require_owner
+from app.config import settings
 from app.core.database import get_db
 from app.core.encryption import decrypt
 from app.core.redis_client import get_redis
@@ -257,3 +259,36 @@ async def explain(
         "sentiment": c.get("sentiment"),
         "decision_chain": chain,
     }
+
+
+@router.api_route("/cron", methods=["GET", "POST"])
+async def cron(secret: str = "", db: AsyncSession = Depends(get_db)):
+    """External-cron autopilot: runs a trading cycle for every owner who has
+    auto-trading enabled (kill switch clear). Protected by CRON_SECRET so anyone
+    pinging this URL on a schedule (e.g. cron-job.org) drives the engine — needed
+    because the in-process scheduler is off on free hosting."""
+    if not settings.cron_secret or secret != settings.cron_secret:
+        raise HTTPException(401, "invalid cron secret")
+
+    from app.services.scheduler import _run_user_cycle
+
+    rows = (
+        await db.execute(
+            select(User, TradingConfig)
+            .join(TradingConfig, TradingConfig.user_id == User.id)
+            .where(
+                User.is_active.is_(True),
+                User.role == "owner",
+                TradingConfig.auto_trading_enabled.is_(True),
+                TradingConfig.kill_switch_active.is_(False),
+            )
+        )
+    ).all()
+    ran = 0
+    for user, cfg_row in rows:
+        try:
+            await _run_user_cycle(user, cfg_row)
+            ran += 1
+        except Exception:
+            continue
+    return {"ran": ran, "eligible": len(rows)}

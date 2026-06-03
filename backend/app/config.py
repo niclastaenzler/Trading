@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     encryption_key: str = ""
     # If set, registration requires this invite code (protects a public instance).
     registration_invite_code: str = ""
+    # Secret to trigger the trading cycle from an external cron (free-tier autopilot).
+    cron_secret: str = ""
 
     # --- Database / cache ---
     database_url: str = "postgresql+asyncpg://trading:trading@localhost:5432/trading"

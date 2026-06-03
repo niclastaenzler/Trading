@@ -1,0 +1,27 @@
+name: Trading autopilot (cron)
+
+# Pings the backend's cron endpoint on a schedule so trades run hands-off even
+# on free hosting (where the in-process scheduler is off / the instance sleeps).
+#
+# Setup:
+#  * Repo Settings -> Secrets and variables -> Actions:
+#      - Variable CRON_BACKEND_URL = https://<your-render>.onrender.com
+#      - Secret   CRON_SECRET      = the same value as Render's CRON_SECRET
+#  * NOTE: scheduled workflows only run from the repository's DEFAULT branch.
+#    If your work is on a feature branch, either merge to the default branch or
+#    use an external cron (e.g. cron-job.org) pointing at the same URL.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger trading cycle
+        run: |
+          curl -sS -m 120 -X POST \
+            "${{ vars.CRON_BACKEND_URL }}/api/trading/cron?secret=${{ secrets.CRON_SECRET }}" \
+            && echo "" && echo "cron ping sent" || echo "cron ping failed (instance may be waking)"

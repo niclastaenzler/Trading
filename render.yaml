@@ -57,3 +57,6 @@ services:
       # Optional: Alpha Vantage key to activate the news-sentiment overlay.
       - key: ALPHAVANTAGE_API_KEY
         sync: false
+      # Secret to drive the trading cycle from an external cron (free-tier autopilot).
+      - key: CRON_SECRET
+        sync: false
