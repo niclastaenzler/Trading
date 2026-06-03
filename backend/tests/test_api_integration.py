@@ -55,13 +55,14 @@ async def test_default_config_is_conservative(owner_client):
 async def test_config_update_clamps_reckless_values(owner_client):
     current = (await owner_client.get("/api/config")).json()["config"]
     current["trading"]["risk_per_trade_pct"] = 2.0  # reckless
-    current["automation"]["max_trades_per_hour"] = 20
+    current["automation"]["max_trades_per_hour"] = 30  # user throughput preference
     res = await owner_client.put("/api/config", json={"config": current})
     assert res.status_code == 200
     saved = res.json()["config"]
-    # Compliance envelope clamps to safe ceilings.
+    # Compliance envelope still clamps per-trade risk to a safe ceiling.
     assert saved["trading"]["risk_per_trade_pct"] == 1.0
-    assert saved["automation"]["max_trades_per_hour"] <= 6
+    # Trade throughput is user-controlled and preserved (not clamped).
+    assert saved["automation"]["max_trades_per_hour"] == 30
 
 
 async def test_kill_switch_blocks_auto_trading(owner_client):

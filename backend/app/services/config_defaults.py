@@ -92,8 +92,8 @@ class AutomationSettings(BaseModel):
     manual_confirmation: bool = Field(
         True, description="Semi-auto: require human approval before each trade"
     )
-    max_trades_per_hour: int = Field(2, ge=1, le=20)
-    max_trades_per_day: int = Field(6, ge=1, le=60)
+    max_trades_per_hour: int = Field(2, ge=1, le=60)
+    max_trades_per_day: int = Field(6, ge=1, le=1000)
     cooldown_seconds: int = Field(300, ge=30, le=86400)
 
 
@@ -159,12 +159,9 @@ class TradingConfigModel(BaseModel):
             # Cap risk and rate, enforce stops + safe cadence.
             self.trading.risk_per_trade_pct = min(self.trading.risk_per_trade_pct, 1.0)
             self.trading.max_open_positions = min(self.trading.max_open_positions, 5)
-            self.automation.max_trades_per_hour = min(
-                self.automation.max_trades_per_hour, 6
-            )
-            self.automation.max_trades_per_day = min(
-                self.automation.max_trades_per_day, 20
-            )
+            # Max trades per hour/day are the user's own throughput preference and
+            # stay user-controlled (bounded only by the field range + the
+            # mandatory per-trade cadence / API rate limiter).
             self.compliance.max_api_requests_per_minute = min(
                 self.compliance.max_api_requests_per_minute, 120
             )
