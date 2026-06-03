@@ -27,6 +27,9 @@ from app.services.trading_engine import TradingEngine
 
 router = APIRouter(prefix="/api/trading", tags=["trading"])
 
+# Autopilot retrains the AI at most this often (seconds), even if pinged faster.
+_TRAIN_INTERVAL_SECONDS = 300  # 5 minutes
+
 
 def _build_broker(user: User):
     creds = {}
@@ -271,6 +274,7 @@ async def cron(secret: str = "", db: AsyncSession = Depends(get_db)):
         raise HTTPException(401, "invalid cron secret")
 
     from app.services.scheduler import _run_user_cycle
+    from app.api.routes.research import train_user_model
 
     rows = (
         await db.execute(
@@ -284,6 +288,8 @@ async def cron(secret: str = "", db: AsyncSession = Depends(get_db)):
             )
         )
     ).all()
+
+    # 1. Run a trading cycle (which itself scans/analyses the whole market).
     ran = 0
     for user, cfg_row in rows:
         try:
@@ -291,4 +297,20 @@ async def cron(secret: str = "", db: AsyncSession = Depends(get_db)):
             ran += 1
         except Exception:
             continue
-    return {"ran": ran, "eligible": len(rows)}
+
+    # 2. Retrain the AI — throttled to once per TRAIN_INTERVAL so frequent cron
+    #    pings don't retrain on every tick (a Redis flag enforces the spacing).
+    redis = get_redis()
+    trained = 0
+    for user, cfg_row in rows:
+        key = f"user:{user.id}:last_model_train"
+        try:
+            if await redis.get(key):
+                continue  # trained recently — skip until the flag expires
+            await train_user_model(db, user, cfg_row.data, bars=600, max_symbols=10)
+            await redis.set(key, "1", ex=_TRAIN_INTERVAL_SECONDS)
+            trained += 1
+        except Exception:
+            continue
+
+    return {"ran": ran, "eligible": len(rows), "trained": trained}

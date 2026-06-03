@@ -89,9 +89,23 @@ async def train_model(
 ):
     """Train ONE pooled multi-asset model on the configured universe's history
     (a basic cross-sectional model), persist it, and load it live."""
-    model = TradingConfigModel(**(cfg.data or {}))
+    return await train_user_model(db, user, cfg.data, bars=bars, max_symbols=max_symbols)
+
+
+async def train_user_model(
+    db: AsyncSession,
+    user: User,
+    cfg_data: dict | None,
+    *,
+    bars: int = 1000,
+    max_symbols: int = 12,
+) -> dict:
+    """Reusable training core (shared by the /train route and the autopilot cron).
+    Fetches the configured universe's history, trains the pooled model, persists
+    and loads it. Returns a result dict with `ok`."""
+    model = TradingConfigModel(**(cfg_data or {}))
     params = model.strategy.indicators
-    symbols = (cfg.data or {}).get("trading", {}).get("allowed_symbols") or all_symbols()
+    symbols = (cfg_data or {}).get("trading", {}).get("allowed_symbols") or all_symbols()
     symbols = symbols[:max_symbols]
 
     creds = {}

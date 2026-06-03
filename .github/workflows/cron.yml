@@ -13,7 +13,7 @@ name: Trading autopilot (cron)
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes
+    - cron: "*/5 * * * *"    # every 5 min (runs a cycle + market analysis + retrain)
   workflow_dispatch:
 
 jobs:
@@ -22,6 +22,6 @@ jobs:
     steps:
       - name: Trigger trading cycle
         run: |
-          curl -sS -m 120 -X POST \
+          curl -sS -m 290 -X POST \
             "${{ vars.CRON_BACKEND_URL }}/api/trading/cron?secret=${{ secrets.CRON_SECRET }}" \
             && echo "" && echo "cron ping sent" || echo "cron ping failed (instance may be waking)"
