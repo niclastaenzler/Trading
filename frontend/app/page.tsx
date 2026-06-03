@@ -113,8 +113,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (!getToken()) { router.push("/login"); return; }
     refresh();
-    loadScan();
     loadModel();
+    // Scan is heavy (many markets) -> on demand only, for a fast initial load.
     const ws = new WebSocket(wsUrl());
     ws.onopen = () => setLive(true);
     ws.onclose = () => setLive(false);
@@ -262,6 +262,64 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="dash">
+      <aside className="dash-side">
+        <div className="card">
+          <h3 className="row" style={{ justifyContent: "space-between" }}>
+            <span>Live-Feed</span>
+            <span className={`live-dot ${live ? "on" : "off"}`}>{live ? "LIVE" : "offline"}</span>
+          </h3>
+          <div className="feed">
+            {feed.length === 0 && <div>Warte auf Ereignisse…</div>}
+            {feed.map((line, i) => <div key={i}>{line}</div>)}
+          </div>
+        </div>
+
+        <div className="card">
+          <h3>Offene Positionen ({positions.length})</h3>
+          {positions.length === 0 ? (
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>Keine offenen Positionen.</p>
+          ) : (
+            <table>
+              <thead><tr><th>Symbol</th><th>Seite</th><th>uPnL</th><th></th></tr></thead>
+              <tbody>
+                {positions.map((p, i) => (
+                  <tr key={i}>
+                    <td>{p.symbol}</td><td>{p.side}</td>
+                    <td className={p.unrealized_pnl >= 0 ? "pos" : "neg"}>{p.unrealized_pnl}</td>
+                    <td><button className="danger" onClick={() => close(p.symbol)} disabled={busy}>×</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="card">
+          <h3 className="row" style={{ justifyContent: "space-between" }}>
+            <span>Letzte Trades</span>
+            <a href="/Trading/trades/" style={{ fontSize: 13 }}>alle →</a>
+          </h3>
+          {recentTrades.length === 0 ? (
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>Noch keine Trades.</p>
+          ) : (
+            <table>
+              <thead><tr><th>Symbol</th><th>Seite</th><th>PnL</th><th>Status</th></tr></thead>
+              <tbody>
+                {recentTrades.map((t) => (
+                  <tr key={t.id} className={t.status === "OPEN" ? "open" : (t.pnl ?? 0) >= 0 ? "win" : "loss"}>
+                    <td>{t.symbol}</td><td>{t.side}</td>
+                    <td className={t.pnl >= 0 ? "pos" : "neg"}>{t.pnl?.toFixed?.(2) ?? "—"}</td>
+                    <td><span className={`pill ${t.status === "OPEN" ? "on" : "off"}`}>{t.status === "OPEN" ? "OFFEN" : "ZU"}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </aside>
+
+      <section className="dash-main">
       <div className="row" style={{ marginBottom: 16 }}>
         <span>
           Auto-Handel:{" "}
@@ -569,64 +627,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3>Offene Positionen ({positions.length})</h3>
-        {positions.length === 0 ? (
-          <p style={{ color: "var(--muted)", fontSize: 13 }}>
-            Keine offenen Positionen. Trades erscheinen hier, sobald die Engine eine eröffnet —
-            <b> Auto-Handel</b> einschalten und <b>Zyklus jetzt ausführen</b> (in Halb-Automatik die
-            Bestätigung oben annehmen).
-          </p>
-        ) : (
-          <table>
-            <thead><tr><th>Symbol</th><th>Seite</th><th>Menge</th><th>Einstieg</th><th>Aktuell</th><th>uPnL</th><th>SL</th><th>TP</th><th></th></tr></thead>
-            <tbody>
-              {positions.map((p, i) => (
-                <tr key={i}>
-                  <td>{p.symbol}</td><td>{p.side}</td><td>{p.quantity}</td><td>{p.entry_price}</td>
-                  <td>{p.current_price}</td>
-                  <td className={p.unrealized_pnl >= 0 ? "pos" : "neg"}>{p.unrealized_pnl}</td>
-                  <td>{p.stop_loss ?? "—"}</td><td>{p.take_profit ?? "—"}</td>
-                  <td><button className="danger" onClick={() => close(p.symbol)} disabled={busy}>Schließen</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3 className="row" style={{ justifyContent: "space-between" }}>
-          <span>Letzte Trades</span>
-          <a href="/Trading/trades/" style={{ fontSize: 13 }}>Alle anzeigen →</a>
-        </h3>
-        {recentTrades.length === 0 ? (
-          <p style={{ color: "var(--muted)", fontSize: 13 }}>Noch keine Trades.</p>
-        ) : (
-          <table>
-            <thead><tr><th>Symbol</th><th>Seite</th><th>Einstieg</th><th>Ausstieg</th><th>PnL</th><th>Status</th></tr></thead>
-            <tbody>
-              {recentTrades.map((t) => (
-                <tr key={t.id} className={t.status === "OPEN" ? "open" : (t.pnl ?? 0) >= 0 ? "win" : "loss"}>
-                  <td>{t.symbol}</td><td>{t.side}</td><td>{t.entry_price}</td><td>{t.exit_price ?? "—"}</td>
-                  <td className={t.pnl >= 0 ? "pos" : "neg"}>{t.pnl?.toFixed?.(2) ?? "—"}</td>
-                  <td><span className={`pill ${t.status === "OPEN" ? "on" : "off"}`}>{t.status === "OPEN" ? "OFFEN" : "ZU"}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3 className="row" style={{ justifyContent: "space-between" }}>
-          <span>Live Signal- &amp; Ereignis-Feed</span>
-          <span className={`live-dot ${live ? "on" : "off"}`}>{live ? "LIVE" : "offline"}</span>
-        </h3>
-        <div className="feed">
-          {feed.length === 0 && <div>Warte auf Ereignisse…</div>}
-          {feed.map((line, i) => <div key={i}>{line}</div>)}
-        </div>
+      </section>
       </div>
     </div>
   );

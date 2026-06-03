@@ -14,6 +14,7 @@ executing, surfacing it for human approval via the API/WebSocket.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -294,14 +295,28 @@ class TradingEngine:
 
     # --- portfolio scan: the AI decides WHAT to trade across the universe ---
     async def scan(self, symbols: list[str]) -> list[tuple]:
-        """Compute the fused AI/pattern/trend signal for every symbol and rank
-        them best-first (actionable first, then by confidence). Returns a list of
-        (symbol, ohlcv_df, signal) so the cycle can act on the strongest ideas."""
+        """Compute the fused signal for every symbol and rank them best-first.
+        Data is fetched CONCURRENTLY (bounded) so scanning many markets is fast.
+        Returns (symbol, ohlcv_df, signal)."""
+        use_sent = self.cfg.strategy.use_sentiment
+        sem = asyncio.Semaphore(6)  # cap concurrency to respect broker rate limits
+
+        async def fetch(sym: str):
+            async with sem:
+                try:
+                    df = await fetch_ohlcv(sym, bars=200, broker=self.broker)
+                    sent = await get_sentiment(sym) if use_sent else 0.0
+                    return sym, df, sent
+                except Exception:
+                    return None
+
+        fetched = await asyncio.gather(*[fetch(s) for s in symbols])
         out: list[tuple] = []
-        for sym in symbols:
+        for item in fetched:
+            if item is None:
+                continue
+            sym, df, sent = item
             try:
-                df = await fetch_ohlcv(sym, bars=200, broker=self.broker)
-                sent = await get_sentiment(sym) if self.cfg.strategy.use_sentiment else 0.0
                 sig = generate_signal(sym, df, self.cfg.strategy, self.cfg.edge, sent)
             except Exception:
                 continue
