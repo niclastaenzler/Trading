@@ -195,7 +195,7 @@ class TradingEngine:
             status="OPEN", mode=mode, confidence=confidence, strategy="fused",
         )
         self.db.add(trade)
-        await self.compliance.record_trade()
+        await self.compliance.record_trade(plan.symbol)
         await log_audit(
             self.db, event="ORDER_PLACED", user_id=self.user_id,
             message=f"{plan.side} {plan.quantity} {plan.symbol} @ {order.price} ({mode})",

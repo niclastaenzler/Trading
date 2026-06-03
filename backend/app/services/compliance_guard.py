@@ -110,9 +110,12 @@ class ComplianceGuard:
     async def allow_api_call(self) -> bool:
         return await self.api_limiter.allow()
 
-    async def _load_state(self) -> TradeState:
+    async def _load_state(self, symbol: str) -> TradeState:
         redis = get_redis()
-        last = await redis.get(f"user:{self.user_id}:last_trade_ts")
+        # Cadence (min delay / cooldown) is tracked PER SYMBOL so one cycle can
+        # build a diversified book (several markets at once); the hourly/daily
+        # caps remain global to bound total churn.
+        last = await redis.get(f"user:{self.user_id}:last_trade_ts:{symbol}")
         hour = await redis.get(f"user:{self.user_id}:trades_hour")
         day = await redis.get(f"user:{self.user_id}:trades_day")
         return TradeState(
@@ -128,7 +131,8 @@ class ComplianceGuard:
         kill_switch: bool,
         auto_trading: bool,
     ) -> ComplianceDecision:
-        state = await self._load_state()
+        symbol = signal.symbol if signal is not None else "_global"
+        state = await self._load_state(symbol)
         return evaluate(
             self.cfg,
             state,
@@ -138,11 +142,12 @@ class ComplianceGuard:
             auto_trading=auto_trading,
         )
 
-    async def record_trade(self) -> None:
-        """Update cadence counters after a trade is placed."""
+    async def record_trade(self, symbol: str = "_global") -> None:
+        """Update cadence counters after a trade is placed (per-symbol delay
+        plus the global hourly/daily counters)."""
         redis = get_redis()
         pipe = redis.pipeline()
-        pipe.set(f"user:{self.user_id}:last_trade_ts", time.time())
+        pipe.set(f"user:{self.user_id}:last_trade_ts:{symbol}", time.time())
         pipe.incr(f"user:{self.user_id}:trades_hour")
         pipe.expire(f"user:{self.user_id}:trades_hour", 3600)
         pipe.incr(f"user:{self.user_id}:trades_day")
