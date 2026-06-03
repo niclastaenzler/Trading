@@ -21,6 +21,55 @@ function setPath(obj: any, path: string, value: any) {
   return clone;
 }
 
+// Small info "ⓘ" with a hover tooltip explaining the field.
+function InfoDot({ text }: { text: string }) {
+  if (!text) return null;
+  return (
+    <span
+      title={text}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 15, height: 15, borderRadius: "50%", fontSize: 10, marginLeft: 6,
+        background: "var(--panel-2)", color: "var(--accent)", cursor: "help",
+        border: "1px solid var(--border)",
+      }}
+    >ⓘ</span>
+  );
+}
+
+// Editable number field with a LOCAL string buffer, so you can type decimals
+// (e.g. "2.5") and temporarily clear the field without it snapping back or
+// producing NaN. The parsed number is committed to the config only when valid.
+function NumField({
+  label, value, step = "any", info = "", onCommit,
+}: {
+  label: string; value: number; step?: string; info?: string;
+  onCommit: (n: number) => void;
+}) {
+  const initial = value === undefined || value === null || Number.isNaN(value)
+    ? "" : String(value);
+  const [raw, setRaw] = useState<string>(initial);
+  // Sync when the value changes from outside (e.g. preset applied, save clamp).
+  useEffect(() => {
+    setRaw(value === undefined || value === null || Number.isNaN(value) ? "" : String(value));
+  }, [value]);
+  return (
+    <div>
+      <label>{label}<InfoDot text={info} /></label>
+      <input
+        type="number"
+        step={step}
+        value={raw}
+        onChange={(e) => {
+          setRaw(e.target.value);
+          const n = parseFloat(e.target.value);
+          if (!Number.isNaN(n)) onCommit(n);
+        }}
+      />
+    </div>
+  );
+}
+
 export default function ConfigPage() {
   const router = useRouter();
   const [cfg, setCfg] = useState<any>(null);
@@ -41,7 +90,6 @@ export default function ConfigPage() {
   if (!cfg) return <p>Lädt…</p>;
 
   const upd = (path: string, value: any) => setCfg(setPath(cfg, path, value));
-  const num = (path: string, v: string) => upd(path, parseFloat(v));
 
   // Add a market group's symbols to the allowed list (unique, keeps existing).
   function addMarket(group: string) {
@@ -107,31 +155,21 @@ export default function ConfigPage() {
     setMsg(`Profil „${name}" übernommen — jetzt unten „Speichern" klicken.`);
   }
 
-  // Small info "ⓘ" with a hover tooltip explaining the field.
-  const Info = ({ text }: { text: string }) =>
-    text ? (
-      <span
-        title={text}
-        style={{
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          width: 15, height: 15, borderRadius: "50%", fontSize: 10, marginLeft: 6,
-          background: "var(--panel-2)", color: "var(--accent)", cursor: "help",
-          border: "1px solid var(--border)",
-        }}
-      >ⓘ</span>
-    ) : null;
-
   const N = (label: string, path: string, step = "any", info = "") => {
-    const val = path.split(".").reduce((o, k) => o[k], cfg);
+    const val = path.split(".").reduce((o, k) => o?.[k], cfg);
     return (
-      <div>
-        <label>{label}<Info text={info} /></label>
-        <input type="number" step={step} value={val} onChange={(e) => num(path, e.target.value)} />
-      </div>
+      <NumField
+        key={path}
+        label={label}
+        value={val}
+        step={step}
+        info={info}
+        onCommit={(n) => upd(path, n)}
+      />
     );
   };
   const B = (label: string, path: string, info = "") => {
-    const val = path.split(".").reduce((o, k) => o[k], cfg);
+    const val = path.split(".").reduce((o, k) => o?.[k], cfg);
     return (
       <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>
         <input
@@ -140,7 +178,7 @@ export default function ConfigPage() {
           checked={!!val}
           onChange={(e) => upd(path, e.target.checked)}
         />
-        {label}<Info text={info} />
+        {label}<InfoDot text={info} />
       </label>
     );
   };
