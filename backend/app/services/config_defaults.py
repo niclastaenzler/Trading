@@ -105,10 +105,16 @@ class RiskSettings(BaseModel):
     trailing_stop_enabled: bool = False
     trailing_stop_value: float = Field(1.0, gt=0, le=20)
     daily_loss_limit_pct: float = Field(
-        3.0, ge=0.5, le=50,
+        3.0, ge=0.5, le=100,
         description="Max loss per day in % before the engine halts. User-controlled.",
     )
-    max_drawdown_pct: float = Field(10.0, ge=2, le=30)
+    daily_loss_limit_enabled: bool = Field(
+        True, description="If false, the daily-loss halt is disabled entirely."
+    )
+    max_drawdown_pct: float = Field(10.0, ge=1, le=100)
+    max_drawdown_enabled: bool = Field(
+        True, description="If false, the drawdown-from-peak halt is disabled."
+    )
     require_stop_loss: bool = Field(True, description="Block trades without a stop")
     # Scale position size by model confidence (within the risk-per-trade budget).
     confidence_scaled_sizing: bool = True

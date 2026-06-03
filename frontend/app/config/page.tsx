@@ -191,6 +191,7 @@ export default function ConfigPage() {
   const worstCase = riskPerTrade * maxOpen; // % vom Konto, wenn alle Stops fallen
   const auto = !cfg.automation.manual_confirmation;
   const around = (cfg.trading.session_windows_utc || []).length === 0;
+  const dailyOn = cfg.risk.daily_loss_limit_enabled !== false;
   const risk =
     worstCase <= 5
       ? { color: "var(--green)", bg: "rgba(46,204,113,.10)", label: "Konservativ", icon: "🛡️" }
@@ -254,9 +255,19 @@ export default function ConfigPage() {
             "Wie viel % deines Kontos pro Trade eingesetzt wird. Höher = größere Gewinne UND Verluste.")}
           {N("Max. gleichzeitige Trades", "trading.max_open_positions", "1",
             "Wie viele Positionen gleichzeitig offen sein dürfen.")}
-          {N("Tagesverlust-Limit (%)", "risk.daily_loss_limit_pct", "any",
+          {dailyOn && N("Tagesverlust-Limit (%)", "risk.daily_loss_limit_pct", "any",
             "Verlierst du an einem Tag so viele %, stoppt der Handel automatisch für den Tag.")}
         </div>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>
+          <input
+            type="checkbox"
+            style={{ width: "auto" }}
+            checked={dailyOn}
+            onChange={(e) => upd("risk.daily_loss_limit_enabled", e.target.checked)}
+          />
+          Handel bei Tagesverlust automatisch stoppen
+          <InfoDot text="Aus = der Bot handelt weiter, egal wie viel an einem Tag verloren wird. Dann gibt es keine Tagesbremse mehr." />
+        </label>
         <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>
           <input
             type="checkbox"
@@ -297,8 +308,13 @@ export default function ConfigPage() {
               könntest du damit einen großen Teil des Kontos an einem schlechten Tag verlieren.</>
             )}
             <br />
-            Der Handel stoppt automatisch, sobald dein Tagesverlust{" "}
-            <b>{Number(cfg.risk.daily_loss_limit_pct) || 0}%</b> erreicht.{" "}
+            {dailyOn ? (
+              <>Der Handel stoppt automatisch, sobald dein Tagesverlust{" "}
+              <b>{Number(cfg.risk.daily_loss_limit_pct) || 0}%</b> erreicht.{" "}</>
+            ) : (
+              <><b style={{ color: "var(--red, #e74c3c)" }}>Keine Tagesbremse</b> — der Bot
+              handelt weiter, egal wie viel an einem Tag verloren wird.{" "}</>
+            )}
             {auto ? "Trades laufen vollautomatisch." : "Du bestätigst jeden Trade selbst."}{" "}
             {around ? "Gehandelt wird rund um die Uhr." : "Gehandelt wird nur im Zeitfenster."}
           </div>
@@ -368,6 +384,8 @@ export default function ConfigPage() {
             {N("Max. Drawdown (%)", "risk.max_drawdown_pct", "any",
               "Maximaler Rückgang vom Höchststand, bevor der Handel pausiert.")}
           </div>
+          {B("Drawdown-Schutz aktiv (Stopp bei Rückgang vom Höchststand)", "risk.max_drawdown_enabled",
+            "Achtung: misst vom Allzeit-Höchststand. Aus = dieser zweite Stopp ist deaktiviert — oft die eigentliche Ursache, wenn der Bot 'einfach nicht mehr handelt'.")}
           {B("Trailing-Stop aktiv", "risk.trailing_stop_enabled",
             "Zieht den Stop bei Gewinn nach.")}
           {B("Positionsgröße nach KI-Konfidenz skalieren", "risk.confidence_scaled_sizing",

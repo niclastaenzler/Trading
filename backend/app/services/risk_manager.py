@@ -97,12 +97,13 @@ class RiskManager:
             return ValidationResult(False, "max open positions reached")
 
         # Daily loss limit (realized_pnl_today is negative when losing).
-        daily_limit = -equity * self.cfg.risk.daily_loss_limit_pct / 100.0
-        if realized_pnl_today <= daily_limit:
-            return ValidationResult(False, "daily loss limit hit")
+        if self.cfg.risk.daily_loss_limit_enabled:
+            daily_limit = -equity * self.cfg.risk.daily_loss_limit_pct / 100.0
+            if realized_pnl_today <= daily_limit:
+                return ValidationResult(False, "daily loss limit hit")
 
         # Max drawdown from peak equity.
-        if peak_equity > 0:
+        if self.cfg.risk.max_drawdown_enabled and peak_equity > 0:
             drawdown = (peak_equity - equity) / peak_equity * 100.0
             if drawdown >= self.cfg.risk.max_drawdown_pct:
                 return ValidationResult(False, "max drawdown protection")
