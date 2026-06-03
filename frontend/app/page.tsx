@@ -89,12 +89,19 @@ export default function Dashboard() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function refresh() {
-    setPerf(await api.performance());
-    setCfg(await api.getConfig());
-    setPending((await api.pending()).pending || []);
-    try { setAccount(await api.account()); } catch { setAccount(null); }
-    try { setPositions(await api.positions()); } catch { setPositions([]); }
-    try { setRecentTrades((await api.trades()).slice(0, 5)); } catch { setRecentTrades([]); }
+    // Fire all requests CONCURRENTLY (not sequentially) so a slow/cold backend
+    // doesn't multiply the wait. On failure keep the last good value instead of
+    // blanking the UI -> the account/positions never flicker to empty.
+    const [perf, conf, pend, acc, pos, trd] = await Promise.allSettled([
+      api.performance(), api.getConfig(), api.pending(),
+      api.account(), api.positions(), api.trades(),
+    ]);
+    if (perf.status === "fulfilled") setPerf(perf.value);
+    if (conf.status === "fulfilled") setCfg(conf.value);
+    if (pend.status === "fulfilled") setPending(pend.value.pending || []);
+    if (acc.status === "fulfilled" && acc.value?.ok !== false) setAccount(acc.value);
+    if (pos.status === "fulfilled") setPositions(pos.value);
+    if (trd.status === "fulfilled") setRecentTrades(trd.value.slice(0, 5));
   }
   refreshRef.current = refresh;
 

@@ -14,10 +14,14 @@ This adapter is network-bound; it is exercised in integration (not unit) tests.
 
 from __future__ import annotations
 
+import hashlib
+import json
+
 import httpx
 import pandas as pd
 
 from app.core.logging_config import get_logger
+from app.core.redis_client import get_redis
 from app.services.broker.broker_interface import (
     BrokerInterface,
     BrokerOrder,
@@ -25,6 +29,11 @@ from app.services.broker.broker_interface import (
 )
 
 logger = get_logger("broker.capital_com")
+
+# Capital.com sessions stay valid ~10 min; cache the CST/security tokens in
+# Redis so we don't re-login (a slow, rate-limited POST /session) on every
+# request. Slightly under the server-side expiry; a 401 triggers a re-login.
+_SESSION_TTL = 8 * 60
 
 LIVE_BASE = "https://api-capital.backend-capital.com"
 DEMO_BASE = "https://demo-api-capital.backend-capital.com"
@@ -58,7 +67,30 @@ class CapitalComBroker(BrokerInterface):
             "Content-Type": "application/json",
         }
 
-    async def connect(self) -> None:
+    @property
+    def _session_key(self) -> str:
+        digest = hashlib.sha256(
+            f"{self.api_key}:{self.identifier}".encode()
+        ).hexdigest()[:16]
+        return f"capsess:{'demo' if self.is_paper else 'live'}:{digest}"
+
+    async def connect(self, *, force: bool = False) -> None:
+        """Open a Capital.com session, reusing cached tokens when possible.
+
+        `force=True` skips the cache and performs a fresh login (used to recover
+        from an expired/invalid cached session)."""
+        if not force:
+            try:
+                cached = await get_redis().get(self._session_key)
+            except Exception:
+                cached = None
+            if cached:
+                data = json.loads(cached)
+                self._cst = data.get("cst")
+                self._security_token = data.get("sec")
+                if self._cst and self._security_token:
+                    return
+
         resp = await self._client.post(
             "/api/v1/session",
             headers={"X-CAP-API-KEY": self.api_key, "Content-Type": "application/json"},
@@ -68,6 +100,27 @@ class CapitalComBroker(BrokerInterface):
         self._cst = resp.headers.get("CST")
         self._security_token = resp.headers.get("X-SECURITY-TOKEN")
         logger.info("capital.com session opened", extra={"demo": self.is_paper})
+        try:
+            await get_redis().set(
+                self._session_key,
+                json.dumps({"cst": self._cst, "sec": self._security_token}),
+                ex=_SESSION_TTL,
+            )
+        except Exception:
+            pass
+
+    async def _get(self, url: str, **kwargs) -> httpx.Response:
+        """GET with the session headers; on 401/403 (expired cached session) it
+        re-logs in once and retries, so a stale cache never surfaces as an error."""
+        resp = await self._client.get(url, headers=self._auth_headers(), **kwargs)
+        if resp.status_code in (401, 403):
+            try:
+                await get_redis().delete(self._session_key)
+            except Exception:
+                pass
+            await self.connect(force=True)
+            resp = await self._client.get(url, headers=self._auth_headers(), **kwargs)
+        return resp
 
     async def get_balance(self) -> float:
         acc = await self.get_account()
@@ -76,7 +129,7 @@ class CapitalComBroker(BrokerInterface):
     async def get_account(self) -> dict:
         """Full account snapshot from /accounts (equity, available & used margin,
         open P/L, currency) — for a realistic broker-style header."""
-        resp = await self._client.get("/api/v1/accounts", headers=self._auth_headers())
+        resp = await self._get("/api/v1/accounts")
         resp.raise_for_status()
         accounts = resp.json().get("accounts", [])
         if not accounts:
@@ -95,9 +148,7 @@ class CapitalComBroker(BrokerInterface):
         }
 
     async def get_price(self, symbol: str) -> float:
-        resp = await self._client.get(
-            f"/api/v1/markets/{symbol}", headers=self._auth_headers()
-        )
+        resp = await self._get(f"/api/v1/markets/{symbol}")
         resp.raise_for_status()
         snap = resp.json().get("snapshot", {})
         bid, offer = snap.get("bid"), snap.get("offer")
@@ -109,9 +160,8 @@ class CapitalComBroker(BrokerInterface):
         self, symbol: str, resolution: str = "HOUR", limit: int = 200
     ) -> pd.DataFrame | None:
         """Fetch OHLC candles from the documented /prices endpoint."""
-        resp = await self._client.get(
+        resp = await self._get(
             f"/api/v1/prices/{symbol}",
-            headers=self._auth_headers(),
             params={"resolution": resolution, "max": limit},
         )
         if resp.status_code >= 400:
@@ -175,7 +225,7 @@ class CapitalComBroker(BrokerInterface):
         )
 
     async def get_positions(self) -> list[BrokerPosition]:
-        resp = await self._client.get("/api/v1/positions", headers=self._auth_headers())
+        resp = await self._get("/api/v1/positions")
         resp.raise_for_status()
         out = []
         for item in resp.json().get("positions", []):
