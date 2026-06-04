@@ -13,7 +13,14 @@ UNIVERSE: dict[str, list[str]] = {
         "USDCAD", "USDCHF", "NZDUSD", "EURGBP", "EURJPY",
     ],
     "commodities": [
-        "GOLD", "SILVER", "OIL_CRUDE", "NATURALGAS", "COPPER",
+        # Metals
+        "GOLD", "SILVER", "PLATINUM", "PALLADIUM", "COPPER",
+        "ALUMINIUM", "ZINC", "NICKEL", "LEAD",
+        # Energy
+        "OIL_CRUDE", "OIL_BRENT", "NATURALGAS", "GASOLINE", "HEATINGOIL",
+        # Agriculture / softs
+        "WHEAT", "CORN", "SOYBEAN", "COFFEE", "SUGAR", "COCOA",
+        "COTTON", "ORANGEJUICE",
     ],
     "indices": [
         "US500", "US100", "US30", "GER40", "UK100",
